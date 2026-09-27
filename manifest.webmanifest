@@ -1,0 +1,22 @@
+{
+  "name": "StreamCart — Watch. Shop. Live.",
+  "short_name": "StreamCart",
+  "description": "Multi-vendor marketplace where you shop from reels and live streams.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Reels", "url": "./pages/reels/reels.html" },
+    { "name": "Live now", "url": "./pages/live/live.html" },
+    { "name": "Cart", "url": "./pages/shop/cart.html" }
+  ]
+}

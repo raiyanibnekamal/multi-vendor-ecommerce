@@ -1,4 +1,9 @@
 import { CONFIG } from './config.js';
+import { t, digits, isBn } from './i18n.js';
+
+export { t, digits, isBn };
+
+const DATE_LOCALE = isBn ? 'bn-BD' : 'en-GB';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -15,39 +20,39 @@ export function escapeHtml(str = '') {
 }
 
 export function formatPrice(n) {
-  return `${CONFIG.CURRENCY}${Math.round(n).toLocaleString('en-IN')}`;
+  return `${CONFIG.CURRENCY}${digits(Math.round(n).toLocaleString('en-IN'))}`;
 }
 
 export function formatNumber(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-  return String(n);
+  if (n >= 1e6) return digits((n / 1e6).toFixed(1).replace(/\.0$/, '')) + 'M';
+  if (n >= 1e3) return digits((n / 1e3).toFixed(1).replace(/\.0$/, '')) + 'K';
+  return digits(n);
 }
 
 export function formatDate(iso, opts = { day: 'numeric', month: 'short', year: 'numeric' }) {
-  return new Date(iso).toLocaleDateString('en-GB', opts);
+  return new Date(iso).toLocaleDateString(DATE_LOCALE, opts);
 }
 
 export function formatDateTime(iso) {
-  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString(DATE_LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 export function timeAgo(iso) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 0) return 'in ' + timeUntil(iso);
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24); if (d < 30) return `${d}d ago`;
+  if (s < 0) return t('in {time}', { time: timeUntil(iso) });
+  if (s < 60) return t('just now');
+  const m = Math.floor(s / 60); if (m < 60) return t('{n}m ago', { n: digits(m) });
+  const h = Math.floor(m / 60); if (h < 24) return t('{n}h ago', { n: digits(h) });
+  const d = Math.floor(h / 24); if (d < 30) return t('{n}d ago', { n: digits(d) });
   return formatDate(iso);
 }
 
 export function timeUntil(iso) {
   const s = Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  if (d > 0) return t('{d}d {h}h', { d: digits(d), h: digits(h) });
+  if (h > 0) return t('{h}h {m}m', { h: digits(h), m: digits(m) });
+  return t('{m}m', { m: digits(m) });
 }
 
 export function debounce(fn, ms = 250) {
@@ -85,7 +90,7 @@ export function stars(rating) {
 }
 
 export function statusBadge(status) {
-  const label = String(status).replace(/_/g, ' ').replace('resolved ', 'resolved: ');
+  const label = t(String(status).replace(/_/g, ' ').replace('resolved ', 'resolved: '));
   return `<span class="status status-${status}">${escapeHtml(label)}</span>`;
 }
 

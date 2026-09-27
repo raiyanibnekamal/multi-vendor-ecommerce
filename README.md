@@ -1,6 +1,13 @@
 # StreamCart — Multi-vendor Marketplace with Reels & Live Shopping
-
 Frontend (HTML / CSS / vanilla JS) for a multi-vendor e-commerce platform where customers shop directly from short videos and live streams. Backend is planned on Supabase — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🚀 Latest Updates
+
+- **PWA (Progressive Web App):** The application is now fully installable on mobile devices and desktops (App Install Prompt included).
+- **Multilingual Support (i18n):** Added seamless support for English and Bengali (bn) languages.
+- **Theme Management:** Integrated Dark and Light mode toggle with `localStorage` persistence.
+- **Enhanced UI/UX:** Added scroll reveal animations, dynamic number counters, brand slider, and polished home sections.
+- **SEO & Meta Tags:** Full meta tags optimization for mobile web-app capability and search engines.
 
 ## Run locally
 

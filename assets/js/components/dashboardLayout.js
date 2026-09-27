@@ -1,6 +1,8 @@
 import { requireRole, logout, currentVendor } from '../core/auth.js';
 import { routes } from '../core/routes.js';
-import { escapeHtml, icon, avatar, initIcons } from '../core/utils.js';
+import { escapeHtml, icon, avatar, initIcons, t } from '../core/utils.js';
+import { themeToggleHtml } from '../core/theme.js';
+import { langToggleHtml } from '../core/i18n.js';
 import { db } from '../services/db.js';
 import { vendorOrdersSync } from '../services/orders.js';
 import { logoHtml } from './header.js';
@@ -60,37 +62,39 @@ export function mountDashboard({ role, active, title }) {
   if (!user) return null;
   const vendor = role === 'vendor' ? currentVendor() : null;
   const nav = role === 'vendor' ? vendorNav(vendor) : adminNav();
-  document.title = `${title} · ${role === 'vendor' ? 'Vendor' : 'Admin'} · StreamCart`;
+  document.title = `${t(title)} · ${role === 'vendor' ? t('Vendor') : t('Admin')} · StreamCart`;
 
   const app = document.getElementById('app');
   app.innerHTML = `
   <div class="dash">
     <aside class="dash-side" data-side>
-      <div class="row-between">${logoHtml(routes.home())}<span class="role-tag">${role}</span></div>
-      ${vendor ? `<div class="dash-store">${avatar(vendor.name, { size: 'sm', color: vendor.color })}<div class="grow"><div class="name truncate">${escapeHtml(vendor.name)}</div><div class="xs" style="color:#94a3b8">${vendor.status === 'approved' ? 'Verified seller' : vendor.status}</div></div></div>` : ''}
+      <div class="row-between">${logoHtml(routes.home())}<span class="role-tag">${t(role)}</span></div>
+      ${vendor ? `<div class="dash-store">${avatar(vendor.name, { size: 'sm', color: vendor.color })}<div class="grow"><div class="name truncate">${escapeHtml(vendor.name)}</div><div class="xs" style="color:#94a3b8">${vendor.status === 'approved' ? t('Verified seller') : t(vendor.status)}</div></div></div>` : ''}
       <nav class="dash-nav">
         ${nav.map((item) => typeof item === 'string'
-          ? `<div class="group">${item}</div>`
-          : `<a href="${item[4]}" class="${item[0] === active ? 'active' : ''}">${icon(item[1])}<span>${item[2]}</span>${item[3] ? `<span class="badge">${item[3]}</span>` : ''}</a>`).join('')}
+          ? `<div class="group">${t(item)}</div>`
+          : `<a href="${item[4]}" class="${item[0] === active ? 'active' : ''}">${icon(item[1])}<span>${t(item[2])}</span>${item[3] ? `<span class="badge">${item[3]}</span>` : ''}</a>`).join('')}
       </nav>
       <div class="bottom dash-nav">
-        ${vendor ? `<a href="${routes.vendor(vendor.id)}">${icon('external-link')}<span>View my store</span></a>` : ''}
-        <a href="${routes.home()}">${icon('shopping-cart')}<span>Back to marketplace</span></a>
-        <a href="#" data-logout>${icon('log-out')}<span>Sign out</span></a>
+        ${vendor ? `<a href="${routes.vendor(vendor.id)}">${icon('external-link')}<span>${t('View my store')}</span></a>` : ''}
+        <a href="${routes.home()}">${icon('shopping-cart')}<span>${t('Back to marketplace')}</span></a>
+        <a href="#" data-logout>${icon('log-out')}<span>${t('Sign out')}</span></a>
       </div>
     </aside>
     <div class="dash-main">
       <header class="dash-top">
         <button class="btn btn-ghost btn-icon dash-toggle" data-toggle aria-label="Menu">${icon('menu')}</button>
-        <h1>${escapeHtml(title)}</h1>
+        <h1>${escapeHtml(t(title))}</h1>
         <div class="right">
-          <button class="btn btn-ghost btn-icon" title="Notifications">${icon('bell')}</button>
+          ${langToggleHtml('btn btn-ghost btn-icon')}
+          ${themeToggleHtml('btn btn-ghost btn-icon')}
+          <button class="btn btn-ghost btn-icon" title="${t('Notifications')}">${icon('bell')}</button>
           ${avatar(user.name, { size: 'sm' })}
           <div class="hide-sm"><div class="small bold">${escapeHtml(user.name)}</div><div class="xs muted">${user.email}</div></div>
         </div>
       </header>
       <div class="dash-content">
-        ${vendor && vendor.status === 'pending' ? `<div class="notice warning mb-2">${icon('clock')}<div><b>Your store is awaiting admin approval.</b> You can set up products now; they'll go public once approved.</div></div>` : ''}
+        ${vendor && vendor.status === 'pending' ? `<div class="notice warning mb-2">${icon('clock')}<div><b>${t('Your store is awaiting admin approval.')}</b> ${t("You can set up products now; they'll go public once approved.")}</div></div>` : ''}
         <div data-content></div>
       </div>
     </div>

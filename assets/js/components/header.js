@@ -1,7 +1,9 @@
 import { CONFIG } from '../core/config.js';
 import { routes, dashboardFor } from '../core/routes.js';
 import { currentUser, logout } from '../core/auth.js';
-import { escapeHtml, icon, avatar, debounce, on, qs } from '../core/utils.js';
+import { escapeHtml, icon, avatar, debounce, on, qs, t, formatPrice } from '../core/utils.js';
+import { themeToggleHtml } from '../core/theme.js';
+import { langToggleHtml } from '../core/i18n.js';
 import { cartCount, getWishlistIds } from '../services/cart.js';
 import { categoryTree } from '../services/catalog.js';
 import { suggest } from '../services/ai.js';
@@ -13,27 +15,27 @@ export function logoHtml(href = routes.home()) {
 
 function accountHtml(user) {
   if (!user) {
-    return `<a class="icon-btn" href="${routes.login(location.pathname + location.search)}">${icon('user')}<span class="hide-sm">Sign in</span></a>`;
+    return `<a class="icon-btn" href="${routes.login(location.pathname + location.search)}">${icon('user')}<span class="hide-sm">${t('Sign in')}</span></a>`;
   }
   const roleLinks = user.role === 'admin'
-    ? `<a href="${routes.adminDash()}">${icon('shield-check')} Admin dashboard</a>`
+    ? `<a href="${routes.adminDash()}">${icon('shield-check')} ${t('Admin dashboard')}</a>`
     : user.role === 'vendor'
-      ? `<a href="${routes.vendorDash()}">${icon('store')} Vendor dashboard</a><a href="${routes.vendorDash('go-live')}">${icon('radio')} Go live</a>`
+      ? `<a href="${routes.vendorDash()}">${icon('store')} ${t('Vendor dashboard')}</a><a href="${routes.vendorDash('go-live')}">${icon('radio')} ${t('Go live')}</a>`
       : '';
   return `
     <div class="account-menu">
       <button class="icon-btn" data-account-toggle>${avatar(user.name, { size: 'sm' })}<span class="hide-sm">${escapeHtml(user.name.split(' ')[0])}</span>${icon('chevron-down', 'hide-sm')}</button>
       <div class="dropdown" data-account-menu>
-        <div class="who"><strong>${escapeHtml(user.name)}</strong><div class="xs muted">${escapeHtml(user.email)} · <span class="badge badge-primary" style="height:18px">${user.role}</span></div></div>
+        <div class="who"><strong>${escapeHtml(user.name)}</strong><div class="xs muted">${escapeHtml(user.email)} · <span class="badge badge-primary" style="height:18px">${t(user.role)}</span></div></div>
         <hr>
         ${roleLinks}
-        <a href="${routes.account()}">${icon('user')} My account</a>
-        <a href="${routes.orders()}">${icon('package')} My orders</a>
-        <a href="${routes.wishlist()}">${icon('heart')} Wishlist</a>
-        <a href="${routes.saved()}">${icon('bookmark')} Saved reels</a>
-        <a href="${routes.following()}">${icon('users')} Following</a>
+        <a href="${routes.account()}">${icon('user')} ${t('My account')}</a>
+        <a href="${routes.orders()}">${icon('package')} ${t('My orders')}</a>
+        <a href="${routes.wishlist()}">${icon('heart')} ${t('Wishlist')}</a>
+        <a href="${routes.saved()}">${icon('bookmark')} ${t('Saved reels')}</a>
+        <a href="${routes.following()}">${icon('users')} ${t('Following')}</a>
         <hr>
-        <button data-logout>${icon('log-out')} Sign out</button>
+        <button data-logout>${icon('log-out')} ${t('Sign out')}</button>
       </div>
     </div>`;
 }
@@ -41,10 +43,10 @@ function accountHtml(user) {
 function megaHtml(root) {
   return `<div class="mega" data-mega="${root.id}"><div class="container mega-inner">
     ${root.children.map((c) => `
-      <div><h4><a href="${routes.products({ category: c.id })}">${escapeHtml(c.name)}</a></h4>
-        ${c.children.length ? `<ul>${c.children.map((g) => `<li><a href="${routes.products({ category: g.id })}">${escapeHtml(g.name)}</a></li>`).join('')}</ul>` : ''}
+      <div><h4><a href="${routes.products({ category: c.id })}">${escapeHtml(t(c.name))}</a></h4>
+        ${c.children.length ? `<ul>${c.children.map((g) => `<li><a href="${routes.products({ category: g.id })}">${escapeHtml(t(g.name))}</a></li>`).join('')}</ul>` : ''}
       </div>`).join('')}
-    <div><h4><a href="${routes.products({ category: root.id })}" class="text-primary">View all ${escapeHtml(root.name)} →</a></h4></div>
+    <div><h4><a href="${routes.products({ category: root.id })}" class="text-primary">${t('View all {name}', { name: escapeHtml(t(root.name)) })} →</a></h4></div>
   </div></div>`;
 }
 
@@ -56,11 +58,11 @@ export function renderHeader(el, { active = '' } = {}) {
 
   el.innerHTML = `
     <div class="topbar"><div class="container">
-      <span>${icon('truck')} Free delivery on orders over ৳${CONFIG.FREE_SHIPPING_MIN.toLocaleString('en-IN')}</span>
+      <span>${icon('truck')} ${t('Free delivery on orders over {amount}', { amount: formatPrice(CONFIG.FREE_SHIPPING_MIN) })}</span>
       <div class="topbar-links">
-        <a href="${routes.register('vendor')}">Sell on ${CONFIG.APP_NAME}</a>
-        <a href="${routes.orders()}">Track order</a>
-        <a href="#" data-open-chat>Help & support</a>
+        <a href="${routes.register('vendor')}">${t('Sell on {app}', { app: CONFIG.APP_NAME })}</a>
+        <a href="${routes.orders()}">${t('Track order')}</a>
+        <a href="#" data-open-chat>${t('Help & support')}</a>
       </div>
     </div></div>
     <header class="site-header">
@@ -69,25 +71,27 @@ export function renderHeader(el, { active = '' } = {}) {
         ${logoHtml()}
         <div class="header-search">
           <form data-search-form autocomplete="off">
-            <input type="search" name="q" placeholder='Try "phone under 20k" or "gift for her"' value="${escapeHtml(active === 'search' ? qs('q') || '' : '')}" aria-label="Search">
+            <input type="search" name="q" placeholder='${t('Try "phone under 20k" or "gift for her"')}' value="${escapeHtml(active === 'search' ? qs('q') || '' : '')}" aria-label="${t('Search')}">
             <span class="ai-chip">${icon('sparkles')} AI</span>
-            <button type="submit" aria-label="Search">${icon('search')}</button>
+            <button type="submit" aria-label="${t('Search')}">${icon('search')}</button>
           </form>
           <div class="search-suggest hidden" data-suggest></div>
         </div>
         <div class="header-actions">
-          <a class="icon-btn hide-sm ${active === 'reels' ? 'text-primary' : ''}" href="${routes.reels()}" title="Reels">${icon('clapperboard')}<span>Reels</span></a>
-          <a class="icon-btn hide-sm" href="${routes.live()}" title="Live">${icon('radio')}<span>Live</span>${liveCount ? '<span class="live-dot"></span>' : ''}</a>
-          <a class="icon-btn hide-sm" href="${routes.wishlist()}" title="Wishlist">${icon('heart')}<span class="count ${getWishlistIds().length ? '' : 'hidden'}" data-wish-count>${getWishlistIds().length}</span></a>
-          <a class="icon-btn" href="${routes.cart()}" title="Cart">${icon('shopping-cart')}<span class="count ${cartCount() ? '' : 'hidden'}" data-cart-count>${cartCount()}</span></a>
+          <a class="icon-btn hide-sm ${active === 'reels' ? 'text-primary' : ''}" href="${routes.reels()}" title="${t('Reels')}">${icon('clapperboard')}<span>${t('Reels')}</span></a>
+          <a class="icon-btn hide-sm" href="${routes.live()}" title="${t('Live')}">${icon('radio')}<span>${t('Live')}</span>${liveCount ? '<span class="live-dot"></span>' : ''}</a>
+          <a class="icon-btn hide-sm" href="${routes.wishlist()}" title="${t('Wishlist')}">${icon('heart')}<span class="count ${getWishlistIds().length ? '' : 'hidden'}" data-wish-count>${getWishlistIds().length}</span></a>
+          ${langToggleHtml()}
+          ${themeToggleHtml()}
+          <a class="icon-btn" href="${routes.cart()}" title="${t('Cart')}">${icon('shopping-cart')}<span class="count ${cartCount() ? '' : 'hidden'}" data-cart-count>${cartCount()}</span></a>
           ${accountHtml(user)}
         </div>
       </div>
       <nav class="cat-nav" data-cat-nav><div class="container">
-        <div class="cat-nav-item"><a href="${routes.categories()}">${icon('layout-grid')} All categories</a></div>
-        ${tree.map((r) => `<div class="cat-nav-item ${currentCat && currentCat === r.id ? 'active' : ''}" data-cat="${r.id}"><a href="${routes.products({ category: r.id })}">${escapeHtml(r.name)}</a></div>`).join('')}
-        <div class="cat-nav-item"><a class="special" href="${routes.products({ onSale: 1, sort: 'discount' })}">${icon('flame')} Deals</a></div>
-        <div class="cat-nav-item"><a class="special" href="${routes.live()}">${icon('radio')} Live now${liveCount ? ` (${liveCount})` : ''}</a></div>
+        <div class="cat-nav-item"><a href="${routes.categories()}">${icon('layout-grid')} ${t('All categories')}</a></div>
+        ${tree.map((r) => `<div class="cat-nav-item ${currentCat && currentCat === r.id ? 'active' : ''}" data-cat="${r.id}"><a href="${routes.products({ category: r.id })}">${escapeHtml(t(r.name))}</a></div>`).join('')}
+        <div class="cat-nav-item"><a class="special" href="${routes.products({ onSale: 1, sort: 'discount' })}">${icon('flame')} ${t('Deals')}</a></div>
+        <div class="cat-nav-item"><a class="special" href="${routes.live()}">${icon('radio')} ${t('Live now')}${liveCount ? ` (${liveCount})` : ''}</a></div>
       </div></nav>
       ${tree.map(megaHtml).join('')}
     </header>`;
@@ -133,9 +137,9 @@ function bindHeader(el) {
     if (q.length < 2) { box.classList.add('hidden'); return; }
     const { products, categories } = suggest(q);
     box.innerHTML = `
-      <a href="${routes.search(q)}">${icon('sparkles', 'text-primary')}<span>Smart search for "<b>${escapeHtml(q)}</b>" across products, reels & live</span></a>
-      ${categories.length ? `<div class="label">Categories</div>${categories.map((c) => `<a href="${routes.products({ category: c.id })}">${icon('folder')} ${escapeHtml(c.name)}</a>`).join('')}` : ''}
-      ${products.length ? `<div class="label">Products</div>${products.map((p) => `<a href="${routes.product(p.id)}"><img src="${p.thumbnail}" alt=""><span class="truncate">${escapeHtml(p.title)}</span></a>`).join('')}` : ''}`;
+      <a href="${routes.search(q)}">${icon('sparkles', 'text-primary')}<span>${t('Smart search for "{q}" across products, reels & live', { q: `<b>${escapeHtml(q)}</b>` })}</span></a>
+      ${categories.length ? `<div class="label">${t('Categories')}</div>${categories.map((c) => `<a href="${routes.products({ category: c.id })}">${icon('folder')} ${escapeHtml(t(c.name))}</a>`).join('')}` : ''}
+      ${products.length ? `<div class="label">${t('Products')}</div>${products.map((p) => `<a href="${routes.product(p.id)}"><img src="${p.thumbnail}" alt=""><span class="truncate">${escapeHtml(p.title)}</span></a>`).join('')}` : ''}`;
     box.classList.remove('hidden');
   }, 150);
   input.addEventListener('input', render);
@@ -143,7 +147,7 @@ function bindHeader(el) {
   document.addEventListener('click', (e) => { if (!e.target.closest('.header-search')) box.classList.add('hidden'); });
 }
 
-export function bindHeaderCounts(el) {
+export function bindHeaderCounts() {
   on('store:cart', () => {
     const n = cartCount();
     document.querySelectorAll('[data-cart-count]').forEach((b) => { b.textContent = n; b.classList.toggle('hidden', !n); });
@@ -158,11 +162,11 @@ export function renderBottomNav(el, active) {
   const user = currentUser();
   const n = cartCount();
   const items = [
-    ['home', 'house', 'Home', routes.home()],
-    ['reels', 'clapperboard', 'Reels', routes.reels()],
-    ['live', 'radio', 'Live', routes.live()],
-    ['cart', 'shopping-cart', 'Cart', routes.cart()],
-    ['account', 'user', user ? 'Account' : 'Sign in', user ? dashboardFor(user.role) : routes.login()],
+    ['home', 'house', t('Home'), routes.home()],
+    ['reels', 'clapperboard', t('Reels'), routes.reels()],
+    ['live', 'radio', t('Live'), routes.live()],
+    ['cart', 'shopping-cart', t('Cart'), routes.cart()],
+    ['account', 'user', user ? t('Account') : t('Sign in'), user ? dashboardFor(user.role) : routes.login()],
   ];
   el.innerHTML = items.map(([key, ic, label, href]) => `
     <a href="${href}" class="${active === key ? 'active' : ''}">${icon(ic)}<span>${label}</span>${key === 'cart' ? `<span class="count ${n ? '' : 'hidden'}" data-cart-count>${n}</span>` : ''}</a>`).join('');

@@ -41,7 +41,7 @@ function render() {
         <div class="msg-body" data-body>
           ${conv.messages.map((m) => `<div class="bubble ${m.from === 'vendor' ? 'me' : 'them'}">${escapeHtml(m.text)}<time>${formatDateTime(m.createdAt)}</time></div>`).join('')}
         </div>
-        <div class="chips" style="padding:10px 16px 0;background:#fff">${icon('sparkles', 'text-primary')}${suggestions(conv).map((s) => `<button class="chip" style="height:30px;font-size:12.5px" data-sug="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
+        <div class="chips" style="padding:10px 16px 0;background:var(--surface)">${icon('sparkles', 'text-primary')}${suggestions(conv).map((s) => `<button class="chip" style="height:30px;font-size:12.5px" data-sug="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
         <form class="msg-compose" data-form><input class="input" name="text" placeholder="Type a reply…" autocomplete="off"><button class="btn btn-primary">${icon('send')} Send</button></form>
       </div>
     </div>`;

@@ -85,6 +85,15 @@ export function loading() {
   return '<div class="loading-block"><div class="spinner"></div></div>';
 }
 
+export function skeletonHome() {
+  const card = '<div class="skel-card"><div class="skeleton skel-thumb"></div><div class="skeleton skel-line"></div><div class="skeleton skel-line sm"></div></div>';
+  return `<div class="container home skel-home">
+    <div class="skel-hero"><div class="skeleton"></div><div class="stack" style="gap:12px"><div class="skeleton"></div><div class="skeleton"></div></div></div>
+    <div class="skel-row">${'<div class="skeleton skel-perk"></div>'.repeat(4)}</div>
+    <div class="grid-products">${card.repeat(8)}</div>
+  </div>`;
+}
+
 let bound = false;
 /** Delegated handlers for add-to-cart / wishlist buttons rendered anywhere. */
 export function bindCardActions() {

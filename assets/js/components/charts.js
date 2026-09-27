@@ -2,13 +2,29 @@ import { formatPrice, formatNumber } from '../core/utils.js';
 
 const PALETTE = ['#2563eb', '#4f46e5', '#0ea5e9', '#16a34a', '#f59e0b', '#db2777', '#7c3aed', '#64748b'];
 
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const gridColor = () => cssVar('--grid-line') || '#eef2f7';
+
 function base() {
   if (!window.Chart) return false;
-  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
-  Chart.defaults.color = '#64748b';
+  Chart.defaults.font.family = "'Inter', 'Hind Siliguri', system-ui, sans-serif";
+  Chart.defaults.color = cssVar('--muted') || '#64748b';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
   return true;
 }
+
+window.addEventListener('theme:change', () => {
+  if (!window.Chart) return;
+  base();
+  Object.values(Chart.instances).forEach((c) => {
+    Object.values(c.options.scales || {}).forEach((s) => {
+      if (s.grid) s.grid.color = gridColor();
+      if (s.ticks) s.ticks.color = Chart.defaults.color;
+    });
+    if (c.options.plugins?.legend?.labels) c.options.plugins.legend.labels.color = Chart.defaults.color;
+    c.update('none');
+  });
+});
 
 export function lineChart(canvas, { labels, datasets, money = true }) {
   if (!base()) return null;
@@ -30,7 +46,7 @@ export function lineChart(canvas, { labels, datasets, money = true }) {
       plugins: { legend: { display: datasets.length > 1 }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${money ? formatPrice(c.parsed.y) : c.parsed.y}` } } },
       scales: {
         x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
-        y: { grid: { color: '#eef2f7' }, border: { display: false }, ticks: { callback: (v) => (money ? '৳' : '') + formatNumber(v) } },
+        y: { grid: { color: gridColor() }, border: { display: false }, ticks: { callback: (v) => (money ? '৳' : '') + formatNumber(v) } },
       },
     },
   });
@@ -47,7 +63,7 @@ export function barChart(canvas, { labels, data, label = 'Value', money = true, 
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => (money ? formatPrice(c.parsed[horizontal ? 'x' : 'y']) : c.formattedValue) } } },
       scales: {
         x: { grid: { display: horizontal }, ticks: horizontal ? { callback: (v) => (money ? '৳' : '') + formatNumber(v) } : {} },
-        y: { grid: { display: !horizontal, color: '#eef2f7' }, border: { display: false }, ticks: horizontal ? {} : { callback: (v) => (money ? '৳' : '') + formatNumber(v) } },
+        y: { grid: { display: !horizontal, color: gridColor() }, border: { display: false }, ticks: horizontal ? {} : { callback: (v) => (money ? '৳' : '') + formatNumber(v) } },
       },
     },
   });

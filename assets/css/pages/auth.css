@@ -1,4 +1,4 @@
-.auth { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: #fff; }
+.auth { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; background: var(--surface); }
 .auth-side { position: relative; overflow: hidden; background: var(--gradient); color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; }
 .auth-side::before { content: ''; position: absolute; width: 520px; height: 520px; border-radius: 50%; background: rgba(255,255,255,.07); right: -180px; top: -160px; }
 .auth-side::after { content: ''; position: absolute; width: 320px; height: 320px; border-radius: 50%; background: rgba(255,255,255,.06); left: -80px; bottom: -120px; }
@@ -20,7 +20,7 @@
 .pw-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); padding: 4px; }
 .demo-box { margin-top: 24px; padding: 16px; border: 1.5px dashed var(--primary-200); border-radius: var(--radius-lg); background: var(--primary-50); }
 .demo-box .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
-.demo-box button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 10px; background: #fff; border: 1px solid var(--primary-100); font-size: 12.5px; font-weight: 600; transition: .15s; }
+.demo-box button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--primary-100); font-size: 12.5px; font-weight: 600; transition: .15s; }
 .demo-box button:hover { border-color: var(--primary); color: var(--primary); }
 .demo-box button svg { width: 20px; height: 20px; color: var(--primary); }
 .or { display: flex; align-items: center; gap: 12px; color: var(--muted-2); font-size: 12px; margin: 20px 0; }

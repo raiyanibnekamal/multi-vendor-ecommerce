@@ -31,7 +31,7 @@ body.reels-page { background: #000; }
 .reel-caption { font-size: 14px; line-height: 1.4; max-width: 92%; }
 .reel-products { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .reel-products::-webkit-scrollbar { display: none; }
-.reel-product { flex: 0 0 auto; width: min(100%, 290px); display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(255,255,255,.96); color: var(--text); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: pop .35s var(--ease); }
+.reel-product { flex: 0 0 auto; width: min(100%, 290px); display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--float-bg); color: var(--text); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: pop .35s var(--ease); }
 .reel-products.multi .reel-product { width: 240px; }
 .reel-products.multi .reel-product .lbl { display: none; }
 .reel-products.multi .reel-product .btn { width: 38px; padding: 0; }

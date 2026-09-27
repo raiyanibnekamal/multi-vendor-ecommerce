@@ -61,7 +61,7 @@ export async function getRecommendations({ limit = 12, exclude = [] } = {}) {
     for (let i = 0; items.length < limit && i < 50; i++) lists.forEach((l) => l[i] && items.length < limit && items.push(l[i]));
   }
   const top = topCategory(a);
-  return respond({ items, reason: hasHistory && top ? `Because you're interested in ${top.name}` : 'Trending picks to get you started', personalised: hasHistory });
+  return respond({ items, reason: hasHistory && top ? `Because you're interested in ${top.name}` : 'Trending picks to get you started', personalised: hasHistory, reasonName: top?.name });
 }
 
 /** Orders reels so ones matching the viewer's interests come first. */
