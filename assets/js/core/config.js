@@ -2,10 +2,10 @@ export const CONFIG = {
   APP_NAME: 'StreamCart',
   TAGLINE: 'Watch. Shop. Live.',
 
-  // Flip to false once the Supabase client is wired into services/db.js.
-  USE_MOCK: true,
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  // Set to false to use live Supabase backend
+  USE_MOCK: false,
+  SUPABASE_URL: 'https://llgyqsfxiokvmxqhztin.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsZ3lxc2Z4aW9rdm14cWh6dGluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MjI4NzMsImV4cCI6MjEwNjA5ODg3M30.txDXkhggwVsT732LvBs06L7aHfVqAje0H1ZO_zfx2ss',
 
   // Live video transport (Agora / LiveKit) is configured by the backend team.
   LIVE_PROVIDER: 'agora',
