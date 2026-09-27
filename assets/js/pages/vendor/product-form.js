@@ -1,10 +1,12 @@
 import { mountDashboard } from '../../components/dashboardLayout.js';
-import { categoryOptions, imageToDataUrl } from '../../components/forms.js';
+import { categoryOptions } from '../../components/forms.js';
 import { toast } from '../../components/toast.js';
 import { routes } from '../../core/routes.js';
-import { escapeHtml, icon, qs, formatPrice, sleep, $, $$ } from '../../core/utils.js';
+import { escapeHtml, icon, qs, formatPrice, $, $$ } from '../../core/utils.js';
 import { saveProduct, categoryById } from '../../services/catalog.js';
+import { uploadFile } from '../../services/storage.js';
 import { db } from '../../services/db.js';
+import { generateProductDescription, generateProductTags } from '../../services/ai.js';
 
 const id = qs('id');
 const el = mountDashboard({ role: 'vendor', active: 'products', title: id ? 'Edit product' : 'Add product' });
@@ -71,7 +73,11 @@ function bind() {
   const fileInput = $('[data-file]');
   const drop = $('[data-drop]');
   const addFiles = async (files) => {
-    for (const file of [...files].filter((x) => x.type.startsWith('image/')).slice(0, 6)) images.push(await imageToDataUrl(file));
+    toast('Uploading image(s)...', 'info');
+    for (const file of [...files].filter((x) => x.type.startsWith('image/')).slice(0, 6)) {
+      const url = await uploadFile('product-images', file);
+      if (url) images.push(url);
+    }
     previews();
   };
   fileInput.onchange = () => addFiles(fileInput.files);
@@ -97,13 +103,18 @@ function bind() {
   };
   $('[data-ai-tags]').onclick = async (e) => {
     e.currentTarget.disabled = true;
-    await sleep(600);
+    const btn = e.currentTarget;
+    try {
+      btn.disabled = true;
+      const aiTags = await generateProductTags({ title: f.title.value, brand: f.brand.value, category: categoryById(f.categoryId.value)?.name || '' });
+      aiTags?.forEach((tag) => { if (!tags.includes(tag)) tags.push(tag); });
+    } catch {}
     const words = `${f.title.value} ${f.brand.value} ${categoryById(f.categoryId.value)?.name || ''}`.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3);
     [...new Set(words)].slice(0, 5).forEach((w) => !tags.includes(w) && tags.push(w));
     if (f.categoryId.value) tags.push(f.categoryId.value);
     tags = [...new Set(tags)];
     tagChips();
-    e.currentTarget.disabled = false;
+    btn.disabled = false;
     toast('AI suggested tags added', 'info');
   };
   $('[data-ai-desc]').onclick = async (e) => {
@@ -111,9 +122,9 @@ function bind() {
     if (!f.title.value.trim()) return toast('Add a product title first', 'error');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span> Writing…';
-    await sleep(1000);
     const cat = categoryById(f.categoryId.value)?.name || 'product';
-    f.description.value = `${f.title.value.trim()}${f.brand.value ? ` by ${f.brand.value.trim()}` : ''} is a thoughtfully designed ${cat.toLowerCase()} built for everyday use. It combines reliable quality with a modern look, making it a great pick for yourself or as a gift. 100% authentic, carefully packed and shipped fast from ${el.vendor.location}.`;
+    const description = await generateProductDescription({ title: f.title.value.trim(), brand: f.brand.value.trim(), category: cat, location: el.vendor.location });
+    f.description.value = description || `${f.title.value.trim()}${f.brand.value ? ` by ${f.brand.value.trim()}` : ''} is a thoughtfully designed ${cat.toLowerCase()} for everyday use. Add verified product details, materials, and features before publishing.`;
     btn.disabled = false;
     btn.innerHTML = `${icon('sparkles')} Write with AI`;
   };

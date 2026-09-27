@@ -11,7 +11,7 @@ let tab = 'requested';
 const TABS = ['requested', 'processing', 'paid', 'all'];
 
 function render() {
-  const all = db.all('payouts').sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
+  const all = db.all('payouts').sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
   const list = tab === 'all' ? all : all.filter((p) => p.status === tab);
   const sum = (s) => all.filter((p) => p.status === s).reduce((n, p) => n + p.amount, 0);
   const owed = db.all('vendors').reduce((n, v) => n + (v.balance || 0), 0);

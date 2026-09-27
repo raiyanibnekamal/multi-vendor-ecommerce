@@ -3,6 +3,7 @@ import { toast } from '../../components/toast.js';
 import { routes } from '../../core/routes.js';
 import { escapeHtml, icon, formatPrice, debounce, $, $$ } from '../../core/utils.js';
 import { createReel, SAMPLE_VIDEOS } from '../../services/reels.js';
+import { uploadFile } from '../../services/storage.js';
 import { suggestTags } from '../../services/ai.js';
 import { db } from '../../services/db.js';
 
@@ -59,6 +60,7 @@ function render() {
 }
 
 function setPreview(src) {
+  if (previewUrl?.startsWith('blob:') && previewUrl !== src) URL.revokeObjectURL(previewUrl);
   previewUrl = src;
   const p = $('[data-preview]');
   p.innerHTML = `<video src="${src}" autoplay muted loop playsinline style="opacity:1"></video>
@@ -135,10 +137,16 @@ function bind() {
     const btn = e.currentTarget;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner" style="width:18px;height:18px;border-width:2px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> Uploading…';
+
+    let uploadedVideoUrl = previewUrl;
+    if (videoFile) {
+      uploadedVideoUrl = await uploadFile('reels', videoFile);
+    }
+
     const first = db.get('products', tagged[0]);
     await createReel({
       vendorId: el.vendor.id, caption: cap.value.trim(), productIds: tagged,
-      videoUrl: videoFile ? null : previewUrl,
+      videoUrl: uploadedVideoUrl || previewUrl,
       poster: first.images[0] || first.thumbnail,
     });
     toast('Reel submitted for review 🎬');

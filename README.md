@@ -1,23 +1,35 @@
-# StreamCart — Multi-vendor Marketplace with Reels & Live Shopping
-Frontend (HTML / CSS / vanilla JS) for a multi-vendor e-commerce platform where customers shop directly from short videos and live streams. Backend is planned on Supabase — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+# StreamCart — Watch. Shop. Live.
+
+[Open the deployed app](https://multi-vendor-ecommerce-ten.vercel.app/)
+
+StreamCart is a multi-vendor marketplace where customers shop from short videos and live streams. It is a vanilla HTML/CSS/JavaScript multi-page app, with Supabase for configured live data and Vercel serverless functions for Groq-backed AI. See [Architecture](docs/ARCHITECTURE.md), [Audit and roadmap](docs/AUDIT_AND_ROADMAP.md), and the [Supabase backend guide](supabase/README.md).
 
 ## 🚀 Latest Updates
 
-- **PWA (Progressive Web App):** The application is now fully installable on mobile devices and desktops (App Install Prompt included).
-- **Multilingual Support (i18n):** Added seamless support for English and Bengali (bn) languages.
-- **Theme Management:** Integrated Dark and Light mode toggle with `localStorage` persistence.
-- **Enhanced UI/UX:** Added scroll reveal animations, dynamic number counters, brand slider, and polished home sections.
-- **SEO & Meta Tags:** Full meta tags optimization for mobile web-app capability and search engines.
+- **PWA:** Install prompt handling, network-first page navigation, and offline asset caching.
+- **Supabase:** Auth bridge, Storage uploads, Realtime subscriptions, and authenticated order writes.
+- **AI:** Optional Groq-backed search ranking, recommendations, chat, tagging, descriptions, and moderation review through a server-side Vercel function.
+- **Multilingual UI:** English/Bangla toggle, including core shopping and checkout pages.
+- **Themes:** Dark and light modes with `localStorage` persistence.
 
 ## Run locally
 
 The app uses ES modules, so it must be served over HTTP (opening the file directly won't work).
 
-- **VS Code / Cursor:** install the *Live Server* extension → right-click `index.html` → *Open with Live Server*.
-- **Node:** `npx http-server . -p 5500 -c-1` → open http://127.0.0.1:5500
-- **Python:** `python -m http.server 5500`
+- **Recommended (app + Vercel API routes):** `npx vercel dev --listen 8000` → open http://127.0.0.1:8000
+- **Static UI only:** `python -m http.server 5500` or VS Code Live Server. The UI works, but `/api/ai` is unavailable and AI calls use local fallbacks.
 
 An internet connection is needed for fonts, icons (Lucide), charts (Chart.js), product images and sample videos.
+
+### Current backend status
+
+The Supabase project is configured in `assets/js/core/config.js`. Live auth and catalog/reel/stream reads use Supabase; demo accounts and offline state use browser storage. Before relying on order reads/writes in an existing Supabase project, apply [`supabase/migrations/07_rls_recursion_fix.sql`](supabase/migrations/07_rls_recursion_fix.sql). Until applied, that project may return PostgreSQL `42P17` recursion errors for orders and order items. Checkout writes an authenticated order and its items, but no payment provider or webhook is integrated; the current UI marks non-COD orders paid without a provider confirmation. Do not treat online payment as production-ready. Payout execution and live-video transport also need trusted provider/server-side workflows.
+
+## Groq AI setup
+
+Recommendations, reel ranking, semantic product-search ranking, support-chat fallback, reel auto-tagging, product tag/description generation, and on-demand moderation review call Groq through the Vercel serverless endpoint at `/api/ai`; local ranking/rules remain as fallback. The Groq key is never sent to browser code. In Vercel Project Settings → Environment Variables, add `GROQ_API_KEY` using a rotated key, then redeploy. Optionally set `GROQ_MODEL` to override the default model.
+
+For local AI testing, use the linked Vercel project with `npx vercel dev` and configure `GROQ_API_KEY` as a Development environment variable via `npx vercel env add GROQ_API_KEY development`. Enter the secret directly in the terminal prompt; do not put it in source files or commit it. Set the same variable in Vercel Project Settings and redeploy to enable AI in production. A key previously pasted into chat should be revoked and rotated. If the endpoint or key is unavailable, AI features fall back to their local heuristic behavior.
 
 ## Demo accounts
 
@@ -27,7 +39,7 @@ An internet connection is needed for fonts, icons (Lucide), charts (Chart.js), p
 | Vendor (TechNest BD) | vendor@demo.com | demo123 |
 | Admin | admin@demo.com | demo123 |
 
-The login page also has one-click demo buttons. All data is stored in your browser's localStorage — use **Admin → Settings → Reset demo data** to start fresh.
+The login page also has one-click demo buttons. Demo accounts and offline state use browser storage; configured live accounts and catalog/order data use Supabase. Use **Admin → Settings → Reset demo data** to clear local demo state.
 
 ## Things to try
 

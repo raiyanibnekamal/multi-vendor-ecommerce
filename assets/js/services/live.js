@@ -8,20 +8,32 @@ import { uid } from '../core/utils.js';
 const VIEWER_NAMES = ['Rakib', 'Mim', 'Sabbir', 'Nabila', 'Fahim', 'Tania', 'Jubayer', 'Riya', 'Mehedi', 'Sumaiya', 'Arif', 'Tuhin', 'Shila', 'Nayeem', 'Priya'];
 export const REACTIONS = ['❤️', '🔥', '😍', '👏', '😂', '🛒'];
 
+function normalizeStream(stream) {
+  if (!stream) return null;
+  const viewers = Number(stream.viewers);
+  return {
+    ...stream,
+    productIds: Array.isArray(stream.productIds) ? stream.productIds : [],
+    viewers: Number.isFinite(viewers) ? viewers : 0,
+  };
+}
+
 export async function getStreams({ status, vendorId } = {}) {
-  let list = db.all('streams');
+  await db.waitForInitialSync();
+  let list = db.all('streams').map(normalizeStream).filter(Boolean);
   if (status) list = list.filter((s) => (Array.isArray(status) ? status.includes(s.status) : s.status === status));
   if (vendorId) list = list.filter((s) => s.vendorId === vendorId);
   const order = { live: 0, scheduled: 1, ended: 2 };
-  return respond([...list].sort((a, b) => order[a.status] - order[b.status] || (b.viewers || 0) - (a.viewers || 0)));
+  return respond([...list].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || b.viewers - a.viewers));
 }
 
 export function streamSync(id) {
-  return db.get('streams', id);
+  return normalizeStream(db.get('streams', id));
 }
 
 export async function getStream(id) {
-  return respond(db.get('streams', id));
+  await db.waitForInitialSync();
+  return respond(streamSync(id));
 }
 
 export function streamChannel(id) {
@@ -39,13 +51,13 @@ export async function scheduleStream({ vendorId, title, scheduledAt, productIds,
 
 export async function startStream(id) {
   const s = db.update('streams', id, { status: 'live', startedAt: new Date().toISOString(), viewers: 0 });
-  streamChannel(id).send('status', 'live');
+  streamChannel(id).send('status', 'live', { remote: false });
   return respond(s);
 }
 
 export async function endStream(id) {
   const s = db.update('streams', id, (st) => ({ status: 'ended', peakViewers: Math.max(st.peakViewers || 0, st.viewers || 0), viewers: 0 }));
-  streamChannel(id).send('status', 'ended');
+  streamChannel(id).send('status', 'ended', { remote: false });
   return respond(s);
 }
 
@@ -55,7 +67,7 @@ export async function updateStream(id, patch) {
 
 export function pinProduct(streamId, productId) {
   db.update('streams', streamId, { pinnedProductId: productId });
-  streamChannel(streamId).send('pin', productId);
+  streamChannel(streamId).send('pin', productId, { remote: false });
 }
 
 export function sendChat(streamId, msg) {

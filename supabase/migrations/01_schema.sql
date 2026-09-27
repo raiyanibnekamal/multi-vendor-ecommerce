@@ -353,7 +353,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'customer'),
+    CASE WHEN NEW.raw_user_meta_data->>'role' = 'vendor' THEN 'vendor' ELSE 'customer' END,
     NEW.raw_user_meta_data->>'phone',
     NEW.raw_user_meta_data->>'avatar_url'
   )

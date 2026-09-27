@@ -1,5 +1,4 @@
-// AI layer (mock). In production each export maps to a Supabase Edge Function
-// that calls an AI API: /recommend, /smart-search, /suggest-tags, /support-chat.
+// AI features use the same-origin serverless proxy when configured and retain local fallbacks.
 import { db, respond } from './db.js';
 import { store } from '../core/store.js';
 import { userKey } from './userdata.js';
@@ -10,6 +9,53 @@ import { CONFIG } from '../core/config.js';
 
 // ---------- Activity tracking (feeds recommendations) ----------
 const WEIGHTS = { view: 1, reel_watch: 2, like: 3, wishlist: 3, cart: 4, purchase: 6, search: 1 };
+let aiUnavailable = false;
+
+async function callAI(action, input) {
+  if (aiUnavailable || typeof location === 'undefined' || location.protocol === 'file:') return null;
+  const controller = new AbortController();
+  const timeoutMs = ['rank-products', 'rank-reels'].includes(action) ? 3_500 : 8_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, input }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    if (result.available === false) {
+      aiUnavailable = true;
+      return null;
+    }
+    return result;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function productAIContext(product) {
+  return {
+    id: product.id,
+    title: product.title,
+    brand: product.brand || '',
+    category: categoryById(product.categoryId)?.name || '',
+    tags: Array.isArray(product.tags) ? product.tags.slice(0, 10) : [],
+    price: product.price,
+    rating: product.rating,
+  };
+}
+
+function reorderByIds(items, ids) {
+  if (!Array.isArray(ids) || !ids.length) return items;
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+  const included = new Set(ordered.map((item) => item.id));
+  return [...ordered, ...items.filter((item) => !included.has(item.id))];
+}
 
 function getActivity() {
   return store.get(userKey('activity'), { categories: {}, vendors: {}, viewed: [] });
@@ -61,17 +107,37 @@ export async function getRecommendations({ limit = 12, exclude = [] } = {}) {
     for (let i = 0; items.length < limit && i < 50; i++) lists.forEach((l) => l[i] && items.length < limit && items.push(l[i]));
   }
   const top = topCategory(a);
+  const ranked = items.length ? await callAI('rank-products', {
+    context: top ? `Shopper is interested in ${top.name}` : 'Popular products across categories',
+    products: items.slice(0, 40).map(productAIContext),
+  }) : null;
+  items = reorderByIds(items, ranked?.ids);
   return respond({ items, reason: hasHistory && top ? `Because you're interested in ${top.name}` : 'Trending picks to get you started', personalised: hasHistory, reasonName: top?.name });
 }
 
 /** Orders reels so ones matching the viewer's interests come first. */
-export function rankReels(reels) {
+export async function rankReels(reels) {
   const a = getActivity();
   const score = (r) => {
-    const prodScore = r.productIds.reduce((s, id) => { const p = db.get('products', id); return s + (p ? scoreProduct(p, a) : 0); }, 0);
-    return prodScore + Math.log10(r.likes + 1) * 2 + (Date.now() - new Date(r.createdAt)) / -86400000 * 0.1;
+    const productIds = Array.isArray(r.productIds) ? r.productIds : [];
+    const likes = Number.isFinite(Number(r.likes)) ? Number(r.likes) : 0;
+    const createdAt = Date.parse(r.createdAt || '');
+    const recency = Number.isFinite(createdAt) ? (Date.now() - createdAt) / -86400000 * 0.1 : 0;
+    const prodScore = productIds.reduce((sum, id) => { const p = db.get('products', id); return sum + (p ? scoreProduct(p, a) : 0); }, 0);
+    return prodScore + Math.log10(likes + 1) * 2 + recency;
   };
-  return [...reels].sort((x, y) => score(y) - score(x));
+  const ranked = [...reels].sort((x, y) => score(y) - score(x));
+  const aiOrder = ranked.length ? await callAI('rank-reels', {
+    interests: Object.entries(a.categories).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([id]) => categoryById(id)?.name || id),
+    reels: ranked.slice(0, 40).map((reel) => ({
+      id: reel.id,
+      caption: reel.caption,
+      likes: reel.likes,
+      productTitles: (Array.isArray(reel.productIds) ? reel.productIds : []).map((id) => db.get('products', id)?.title).filter(Boolean).slice(0, 5),
+    })),
+  }) : null;
+  const rankedPrefix = reorderByIds(ranked.slice(0, 40), aiOrder?.ids);
+  return [...rankedPrefix, ...ranked.slice(40)];
 }
 
 // ---------- Smart / semantic search ----------
@@ -207,15 +273,22 @@ export async function smartSearch(query, { limit = 60 } = {}) {
   if (f.onSale) products = products.filter((p) => p.discount >= 10);
   let scored = products.map((p) => [p, productScore(p, f, catIds)]);
   if (f.keywords.length) scored = scored.filter(([, s]) => s > (catIds ? 4 : 0));
-  const sorters = { 'price-asc': (a, b) => a[0].price - b[0].price, rating: (a, b) => b[0].rating - a[0].rating, newest: (a, b) => b[0].createdAt.localeCompare(a[0].createdAt) };
+  const sorters = { 'price-asc': (a, b) => a[0].price - b[0].price, rating: (a, b) => b[0].rating - a[0].rating, newest: (a, b) => String(b[0].createdAt || '').localeCompare(String(a[0].createdAt || '')) };
   scored.sort(sorters[f.sort] || ((a, b) => b[1] - a[1] || b[0].sold - a[0].sold));
-  const items = scored.slice(0, limit).map(([p]) => p);
+  const aiOrder = scored.length ? await callAI('rank-products', {
+    query,
+    products: scored.slice(0, 40).map(([product]) => productAIContext(product)),
+  }) : null;
+  const rankedPrefix = reorderByIds(scored.slice(0, 40).map(([product]) => product), aiOrder?.ids);
+  const rankedById = new Map(scored.map(([product, score]) => [product.id, [product, score]]));
+  const rankedScored = [...rankedPrefix.map((product) => rankedById.get(product.id)), ...scored.slice(40)];
+  const items = rankedScored.slice(0, limit).map(([p]) => p);
   const hitIds = new Set(items.map((p) => p.id));
   const words = [...f.keywords, ...[...f.categories].flatMap((c) => SYNONYMS[c] || [])];
   const textHit = (t) => words.some((w) => t.toLowerCase().includes(w));
 
-  const reels = db.where('reels', (r) => r.status === 'approved' && liveVendors.has(r.vendorId) && (r.productIds.some((id) => hitIds.has(id)) || textHit(r.caption)));
-  const streams = db.where('streams', (s) => s.status !== 'ended' && (s.productIds.some((id) => hitIds.has(id)) || textHit(s.title)));
+  const reels = db.where('reels', (r) => r.status === 'approved' && liveVendors.has(r.vendorId) && ((Array.isArray(r.productIds) && r.productIds.some((id) => hitIds.has(id))) || textHit(r.caption)));
+  const streams = db.where('streams', (s) => s.status !== 'ended' && ((Array.isArray(s.productIds) && s.productIds.some((id) => hitIds.has(id))) || textHit(s.title)));
   store.set(userKey('lastSearch'), query);
   if (catIds) [...f.categories].slice(0, 2).forEach((c) => track('search', { categoryId: c }));
   return respond({ products: items, reels, streams, chips: f.chips, corrections: f.corrections }, 300);
@@ -247,9 +320,38 @@ export async function suggestTags({ vendorId, caption = '', fileName = '' }) {
   if (!fromContent) scored = [...pool].sort((a, b) => b.sold - a.sold).map((p) => [p, 0.5]);
   const max = Math.max(...scored.map(([, s]) => s), 1);
   await sleep(1100);
-  const suggestions = scored.slice(0, 5).map(([p, s]) => ({ product: p, confidence: Math.round((fromContent ? 60 + (s / max) * 38 : 35 + Math.random() * 15)) }));
+  const fallback = scored.slice(0, 5).map(([p, s]) => ({ product: p, confidence: Math.round((fromContent ? 60 + (s / max) * 38 : 35 + Math.random() * 15)) }));
+  const aiOrder = pool.length ? await callAI('suggest-tags', {
+    caption,
+    fileName,
+    products: pool.slice(0, 40).map(productAIContext),
+  }) : null;
+  const byId = new Map(fallback.concat(scored.map(([product]) => ({ product, confidence: 45 }))).map((item) => [item.product.id, item]));
+  const suggestions = Array.isArray(aiOrder?.ids) && aiOrder.ids.length
+    ? aiOrder.ids.map((id, index) => byId.get(id) || (pool.find((product) => product.id === id) && { product: pool.find((product) => product.id === id), confidence: Math.max(55, 90 - index * 7) })).filter(Boolean).slice(0, 5)
+    : fallback;
   const labels = [...new Set(suggestions.map((x) => categoryById(x.product.categoryId)?.name))].filter(Boolean);
   return { suggestions, labels, fromContent };
+}
+
+export async function generateProductDescription({ title, brand = '', category = '', location = '' }) {
+  const result = await callAI('product-description', { product: { title, brand, category, location } });
+  return typeof result?.description === 'string' && result.description.trim() ? result.description.trim() : null;
+}
+
+export async function generateProductTags({ title, brand = '', category = '' }) {
+  const result = await callAI('product-tags', { product: { title, brand, category } });
+  return Array.isArray(result?.tags) ? result.tags.filter((tag) => typeof tag === 'string').slice(0, 8) : null;
+}
+
+export async function reviewReelWithAI(reel) {
+  const products = (Array.isArray(reel.productIds) ? reel.productIds : [])
+    .map((id) => db.get('products', id))
+    .filter(Boolean)
+    .map((product) => ({ title: product.title, brand: product.brand || '' }));
+  const review = await callAI('moderate-reel', { caption: reel.caption || '', products, reported: reel.status === 'flagged' });
+  if (!review || !Number.isFinite(review.score) || !Array.isArray(review.flags)) return null;
+  return review;
 }
 
 // ---------- Support chat assistant ----------
@@ -297,5 +399,7 @@ export async function supportChat(message) {
   if (res.products.length) {
     return { text: `Here are some picks for you${res.chips.length ? ` (${res.chips.join(' · ')})` : ''}:`, products: res.products.slice(0, 3) };
   }
+  const aiReply = await callAI('support-chat', { message });
+  if (typeof aiReply?.text === 'string' && aiReply.text.trim()) return { text: aiReply.text.trim() };
   return { text: "Sorry, I didn't quite get that. I can help with:\n• Tracking an order\n• Delivery & returns\n• Payment methods\n• Finding products (e.g. \"phone under 20k\")" };
 }

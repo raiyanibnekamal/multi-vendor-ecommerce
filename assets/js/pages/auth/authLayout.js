@@ -2,9 +2,11 @@ import { icon, initIcons } from '../../core/utils.js';
 import { routes } from '../../core/routes.js';
 import { logoHtml } from '../../components/header.js';
 import { db } from '../../services/db.js';
+import { registerSW } from '../../core/pwa.js';
 
 /** Split-screen auth layout. Returns the form container. */
 export function mountAuth(sideTitle = 'Watch. Shop. Live.') {
+  registerSW();
   const posters = db.where('reels', (r) => r.status === 'approved').slice(0, 3).map((r) => r.poster);
   document.getElementById('app').innerHTML = `
   <div class="auth">

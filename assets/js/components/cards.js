@@ -52,6 +52,7 @@ export function reelThumb(r) {
 
 export function liveCard(s) {
   const v = db.get('vendors', s.vendorId);
+  const productCount = Array.isArray(s.productIds) ? s.productIds.length : 0;
   const tag = s.status === 'live'
     ? `<span class="badge badge-live">LIVE</span><span class="badge viewers">${icon('eye')} ${formatNumber(s.viewers)}</span>`
     : s.status === 'scheduled'
@@ -62,7 +63,7 @@ export function liveCard(s) {
     <div class="thumb"><img src="${s.thumbnail}" alt="" loading="lazy"><div class="tl">${tag}</div></div>
     <div class="body">
       ${avatar(v?.name || '?', { size: 'sm', color: v?.color })}
-      <div class="grow"><h4 class="clamp-2" style="font-size:14px">${escapeHtml(s.title)}</h4><span class="xs muted">${escapeHtml(v?.name || '')} · ${s.productIds.length} products</span></div>
+      <div class="grow"><h4 class="clamp-2" style="font-size:14px">${escapeHtml(s.title)}</h4><span class="xs muted">${escapeHtml(v?.name || '')} · ${productCount} products</span></div>
     </div>
   </a>`;
 }

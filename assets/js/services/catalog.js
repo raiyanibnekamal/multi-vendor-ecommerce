@@ -92,7 +92,7 @@ export async function getProducts({ category, vendorId, q, ids, minPrice, maxPri
 
   const sorters = {
     popular: (a, b) => b.sold - a.sold,
-    newest: (a, b) => b.createdAt.localeCompare(a.createdAt),
+    newest: (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
     'price-asc': (a, b) => a.price - b.price,
     'price-desc': (a, b) => b.price - a.price,
     rating: (a, b) => b.rating - a.rating,

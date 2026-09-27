@@ -14,10 +14,24 @@ let filter = 'all';
 
 async function render() {
   main.innerHTML = loading();
+  try {
+    await renderContent();
+  } catch (error) {
+    console.error('[StreamCart] Live page failed to render:', error);
+    main.innerHTML = `<div class="container page">${emptyState('radio', 'Live streams could not load', 'Please try again.', '<button class="btn btn-primary" data-live-retry>Retry</button>')}</div>`;
+    $('[data-live-retry]')?.addEventListener('click', render);
+  }
+}
+
+async function renderContent() {
   const all = await getStreams();
   const inFilter = (s) => filter === 'all' || rootOf(s.categoryId)?.id === filter;
   const live = all.filter((s) => s.status === 'live' && inFilter(s));
-  const upcoming = all.filter((s) => s.status === 'scheduled' && inFilter(s)).sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  const upcoming = all.filter((s) => s.status === 'scheduled' && inFilter(s)).sort((a, b) => {
+    const dateA = Date.parse(a.scheduledAt || '');
+    const dateB = Date.parse(b.scheduledAt || '');
+    return (Number.isFinite(dateA) ? dateA : Infinity) - (Number.isFinite(dateB) ? dateB : Infinity);
+  });
   const replays = all.filter((s) => s.status === 'ended' && inFilter(s));
   const roots = [...new Set(all.map((s) => rootOf(s.categoryId)?.id).filter(Boolean))];
   const reminders = getList('reminders');
@@ -39,7 +53,7 @@ async function render() {
 
     <div class="chips mb-3">
       <button class="chip ${filter === 'all' ? 'active' : ''}" data-f="all">All</button>
-      ${roots.map((r) => `<button class="chip ${filter === r ? 'active' : ''}" data-f="${r}">${escapeHtml(categoryById(r).name)}</button>`).join('')}
+      ${roots.map((r) => `<button class="chip ${filter === r ? 'active' : ''}" data-f="${r}">${escapeHtml(categoryById(r)?.name || r)}</button>`).join('')}
     </div>
 
     <section>
@@ -52,7 +66,7 @@ async function render() {
       ${upcoming.length ? `<div class="live-grid">${upcoming.map((s) => `
         <div class="stack" style="gap:8px">
           ${liveCard(s)}
-          <div class="row-between"><span class="small muted">${icon('clock')} ${formatDateTime(s.scheduledAt)}</span>
+          <div class="row-between"><span class="small muted">${icon('clock')} ${s.scheduledAt ? formatDateTime(s.scheduledAt) : 'Time TBD'}</span>
           <button class="btn btn-sm ${reminders.includes(s.id) ? 'btn-soft' : 'btn-outline'}" data-remind="${s.id}">${icon(reminders.includes(s.id) ? 'bell-ring' : 'bell')} ${reminders.includes(s.id) ? 'Reminder set' : 'Remind me'}</button></div>
         </div>`).join('')}</div>` : emptyState('calendar', 'Nothing scheduled')}
     </section>

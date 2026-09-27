@@ -54,6 +54,13 @@ INSERT INTO public.vendors (id, name, slug, owner_name, email, phone, location, 
 INSERT INTO public.vendors (id, name, slug, owner_name, email, phone, location, color, description, status, verified, rating, followers, commission_rate, balance) VALUES ('v11', 'PetPal Store', 'petpal-store', 'Shakil Ahmed', 'petpal@demo.com', '+8801772858484', 'Cumilla', '#0891b2', 'Pet food, toys and accessories. (Awaiting approval)', 'pending', FALSE, 0, 0, 10, 0) ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.vendors (id, name, slug, owner_name, email, phone, location, color, description, status, verified, rating, followers, commission_rate, balance) VALUES ('v12', 'QuickDeals', 'quickdeals', 'Rubel Mia', 'quickdeals@demo.com', '+8801784305901', 'Narayanganj', '#475569', 'Flash deals on everything.', 'suspended', FALSE, 0, 0, 10, 0) ON CONFLICT (id) DO NOTHING;
 
+UPDATE public.vendors AS vendor
+SET owner_id = profile.id
+FROM public.profiles AS profile
+WHERE vendor.owner_id IS NULL
+	AND profile.role = 'vendor'
+	AND lower(profile.email) = lower(vendor.email);
+
 
 -- 3. PRODUCTS
 INSERT INTO public.products (id, vendor_id, category_id, title, slug, brand, description, price, original_price, stock, sold, status, thumbnail, images, tags, rating, reviews_count) VALUES ('p1', 'v5', 'makeup', 'Essence Mascara Lash Princess', 'p1', 'Essence', 'The Essence Mascara Lash Princess is a popular mascara known for its volumizing and lengthening effects. Achieve dramatic lashes with this long-lasting and cruelty-free formula.', 1180, 1310, 99, 2524, 'active', 'https://cdn.dummyjson.com/product-images/beauty/essence-mascara-lash-princess/thumbnail.webp', ARRAY['https://cdn.dummyjson.com/product-images/beauty/essence-mascara-lash-princess/1.webp']::text[], ARRAY['beauty', 'mascara']::text[], 2.6, 443) ON CONFLICT (id) DO NOTHING;

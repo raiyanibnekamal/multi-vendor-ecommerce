@@ -9,6 +9,7 @@ import { getStreams } from '../services/live.js';
 import { getVendors } from '../services/vendors.js';
 import { getRecommendations, rankReels } from '../services/ai.js';
 import { db } from '../services/db.js';
+import { resolveMediaUrl } from '../services/storage.js';
 
 const main = mountShell({ active: 'home' });
 
@@ -38,7 +39,7 @@ function heroPhone(reel) {
   return `
     <div class="hero-visual" aria-hidden="true">
       <div class="phone">
-        <video src="${reel.videoUrl}" poster="${reel.poster}" muted autoplay loop playsinline preload="metadata"></video>
+        <video ${reel.videoUrl ? `src="${reel.videoUrl}"` : ''} poster="${reel.poster}" muted autoplay loop playsinline preload="metadata"></video>
         <div class="phone-ui">
           <div class="row" style="gap:8px">${avatar(v?.name || '', { size: 'sm', color: v?.color })}<b class="small">@${escapeHtml(v?.slug || '')}</b></div>
           <p class="xs clamp-2">${escapeHtml(reel.caption)}</p>
@@ -60,7 +61,8 @@ async function render() {
     getProducts({ onSale: true, sort: 'discount', limit: 12 }), getProducts({ sort: 'popular', limit: 10 }),
     getRecommendations({ limit: 10 }), getProducts({ limit: 1 }),
   ]);
-  const ranked = rankReels(reels);
+  const rankedReels = await rankReels(reels);
+  const ranked = await Promise.all(rankedReels.map(async (reel) => ({ ...reel, videoUrl: await resolveMediaUrl(reel.videoUrl) })));
   const live = streams.filter((s) => s.status === 'live');
   const tree = categoryTree();
   const heroDeal = deals.items[0];
@@ -275,15 +277,11 @@ function startDealTimer(el) {
   setInterval(tick, 1000);
 }
 
-let installPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
+import { promptInstall } from '../core/pwa.js';
+
 function bindInstall(btn) {
   if (!btn) return;
-  btn.onclick = async () => {
-    if (installPrompt) { installPrompt.prompt(); installPrompt = null; return; }
-    const ios = /iphone|ipad/i.test(navigator.userAgent);
-    toast(ios ? t('Tap Share, then "Add to Home Screen"') : t('Use your browser menu → "Install app" / "Add to Home screen"'), 'info');
-  };
+  btn.onclick = () => promptInstall();
 }
 
 main.innerHTML = skeletonHome();

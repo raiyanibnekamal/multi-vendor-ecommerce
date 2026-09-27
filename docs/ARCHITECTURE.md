@@ -1,6 +1,6 @@
 # StreamCart — Architecture Notes & Trade-offs
 
-StreamCart is a multi-vendor marketplace where shopping happens inside short videos (reels) and live broadcasts. This document explains how the **frontend** is built, how it maps onto the planned **Supabase** backend, and the trade-offs made along the way.
+StreamCart is a multi-vendor marketplace where shopping happens inside short videos (reels) and live broadcasts. This document describes the current vanilla-JavaScript frontend, its Supabase/Vercel integration, and the production capabilities that remain unfinished.
 
 ---
 
@@ -10,9 +10,9 @@ StreamCart is a multi-vendor marketplace where shopping happens inside short vid
 |---|---|
 | Plain HTML / CSS / JS (brief requirement) | No framework, no bundler. Native ES modules + one CSS design system. |
 | "Buy without leaving the video" | A shared in-drawer checkout (`components/quickBuy.js`) used by reels and live. |
-| Supabase-only backend | Every data call goes through a thin `services/` layer shaped like Supabase queries, so the mock can be swapped for the real client. |
+| Usable with or without hosted services | The service layer supports Supabase-backed data plus local seeded/demo state and browser persistence. |
 | Three roles (Admin, Vendor, Customer) | Role-guarded dashboards (`mountDashboard` → `requireRole`) mirroring what RLS will enforce server-side. |
-| Demo-able without a backend | Seed data + localStorage persistence + BroadcastChannel "realtime". |
+| Demo-able without hosted services | Seed data + localStorage persistence + BroadcastChannel fallback. |
 
 ---
 
@@ -26,27 +26,29 @@ admin/*.html               Admin dashboard (12 pages)
 assets/
   css/   base → layout → components → dashboard → pages/*   (imported by main.css)
   js/
-    core/        config, routes, auth (session + role guard), store (localStorage), utils
+    core/        config, routes, auth (Supabase bridge + demo session), store, utils, PWA
     data/        seed rows — one file per future Postgres table
-    services/    db, catalog, cart, orders, reels, live, vendors, userdata, ai, analytics, realtime
+    services/    db, catalog, cart, orders, reels, live, vendors, userdata, AI, analytics, realtime, storage
     components/  header, footer, shell, dashboardLayout, modal, toast, cards, charts, quickBuy, chatWidget, forms
     pages/       one entry module per HTML page (same path as the HTML file)
+  api/ai.js                  Vercel serverless proxy for Groq requests
+  sw.js                      PWA service worker
 docs/ARCHITECTURE.md
 ```
 
 **Page pattern.** Every HTML file is a thin shell (`<div id="app">` + one `<script type="module">`). The page module mounts a layout (`mountShell` for storefront, `mountDashboard` for vendor/admin) and renders into it. `data-root` on `<body>` lets the same modules work at any folder depth.
 
-**Rendering.** Template literals + `innerHTML`, all user-provided strings passed through `escapeHtml`. Event handlers are re-bound after each render. Icons are Lucide (`<i data-lucide>`), auto-hydrated by a `MutationObserver`.
+**Rendering.** Template literals + `innerHTML`; views use `escapeHtml` for dynamic display strings, but escaping must be checked at each rendering boundary. Event handlers are re-bound after each render. Icons are Lucide (`<i data-lucide>`), auto-hydrated by a `MutationObserver`.
 
 **Why a multi-page app, not an SPA?** Each page is independently linkable/SEO-friendly, there is no client router to maintain, and a failure on one page cannot break the others. The cost is a full page load on navigation (mitigated by small modules and HTTP caching).
 
 ---
 
-## 3. Mock backend → Supabase mapping
+## 3. Data and service architecture
 
-`services/db.js` exposes `all / get / where / insert / update / remove`, each table seeded from `assets/js/data/` and persisted to `localStorage` (`sc_db_<table>`). `respond()` adds latency and returns a clone so pages are written as if they were awaiting a network call.
+`services/db.js` exposes `all / get / where / insert / update / remove`. It initializes from seed data/localStorage and asynchronously hydrates configured tables from Supabase. Supabase Auth is used for non-demo accounts; seeded demo accounts remain local. Orders are written remotely only for a matching authenticated Supabase UUID. Checkout awaits separate order-header and order-item writes, then updates product stock separately; it does not call the SQL `place_order_atomic` RPC, so the full operation is not atomic. If remote reads fail, local/demo data remains available.
 
-To go live: set `USE_MOCK=false`, add `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `core/config.js`, and replace the helpers inside each service with `supabase.from(table)` calls. **Page code does not change** — it only talks to services.
+The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Live order reads require the RLS recursion fix in `supabase/migrations/07_rls_recursion_fix.sql`; apply that migration to existing databases before relying on the orders workflow.
 
 ### 3.1 Tables (Postgres)
 
@@ -66,42 +68,43 @@ To go live: set `USE_MOCK=false`, add `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `c
 | `order_items` | order_id, product_id, vendor_id, price, qty, status | Split per vendor for fulfilment |
 | `payouts`, `disputes`, `conversations`, `messages`, `follows`, `user_events` | | `user_events` feeds recommendations |
 
-### 3.2 Row Level Security (summary)
+### 3.2 Row Level Security (implemented intent)
 
 - **Customers**: read approved vendors / active products / approved reels; read & write only their own cart, wishlist, orders, likes, comments.
-- **Vendors**: full CRUD on rows where `vendor_id = my_vendor_id()`; read `order_items` for their products only; cannot change `commission_rate`, `status` or `verified`.
+- **Vendors**: product/order access is scoped by vendor ID. The current vendor-row UPDATE policy checks ownership but does not enforce column-level restrictions for `commission_rate`, `status` or `verified`; harden this before treating those fields as protected.
 - **Admins**: `is_admin()` helper grants all; moderation/status columns are writable **only** by admins (column-level policy or RPC).
-- Money-moving writes (placing orders, payouts, refunds) happen in **Edge Functions** with the service role, never directly from the browser.
+- Order INSERT policies are restricted to authenticated customers and customer-owned orders/items. Guest checkout is intentionally unsupported.
+- Client role guards are UX only; RLS is the enforcement boundary. The deployed database's migration state must be verified separately. Payment capture, payouts, and refunds still need trusted server-side workflows before production use.
 
 ### 3.3 Storage buckets
 
 | Bucket | Access |
 |---|---|
 | `product-images` | public read; write restricted to the owning vendor's folder (`vendor_id/…`) |
-| `reels` | public read for approved reels; vendor-scoped write; a transcode/thumbnail job produces the poster |
+| `reels` | Public-read bucket with vendor-scoped write policies in SQL; no server-side transcode job is implemented. |
 | `avatars` | public read; user-scoped write |
 
 ### 3.4 Realtime
 
-`services/realtime.js` mimics Supabase Realtime with `BroadcastChannel` (open two tabs to see it work):
+`services/realtime.js` uses Supabase Postgres Changes where configured and `BroadcastChannel` as a same-browser fallback:
 
 | Channel | Events | Supabase equivalent |
 |---|---|---|
 | `orders` | `order:new`, `order:update` | Postgres changes on `orders` / `order_items` (filtered by RLS) |
 | `stream:<id>` | `chat`, `reaction`, `pin`, `status` | Broadcast channel per stream (chat/reactions are ephemeral; only pin/status persisted) |
 
-Presence (viewer count) would use Supabase Realtime **Presence** on `stream:<id>`.
+Presence (viewer count) is currently simulated/local; production viewer presence should use Supabase Realtime **Presence** on `stream:<id>`.
 
 ### 3.5 Edge Functions
 
-| Function | Purpose |
+| Function | Status and purpose |
 |---|---|
-| `checkout` | Validate cart & stock, create order + items, create payment intent (Stripe / SSLCommerz / bKash) |
-| `payment-webhook` | Mark order paid, decrement stock, credit vendor balance minus commission |
-| `live-token` | Mint an Agora/LiveKit token (publisher for the owning vendor, subscriber for viewers) |
-| `moderate-reel` | Run AI safety checks on upload; set `pending` or `flagged` |
-| `recommend`, `search`, `auto-tag`, `support-chat` | AI features (see §5) |
-| `payout-process`, `dispute-resolve` | Admin money operations |
+| `api/ai.js` | Implemented Vercel function; validates allowlisted AI actions and calls Groq using server-only `GROQ_API_KEY`. |
+| `place_order_atomic` (`05_rpc.sql`) | Defined in SQL but not called by the current frontend checkout. The UI writes order header/items separately and adjusts stock separately. |
+| `checkout`, `payment-webhook` | No payment-provider integration is present. The current frontend marks non-COD orders paid without provider confirmation; this is demo behavior, not a valid payment signal. |
+| `live-token` | Planned. Live video transport is currently sample media/demo simulation. |
+| `moderate-reel` | Groq review is available on demand as decision support; human moderation remains authoritative. |
+| `payout-process`, `dispute-resolve` | Planned trusted server-side money operations. |
 
 ---
 
@@ -113,23 +116,26 @@ Presence (viewer count) would use Supabase Realtime **Presence** on `stream:<id>
 
 ---
 
-## 5. AI features (mocked client-side in `services/ai.js`)
+## 5. AI features (Groq + local fallback)
 
-| Feature | Demo implementation | Production plan |
+| Feature | Current implementation |
 |---|---|---|
-| Recommendations | Weighted user events (view, cart, purchase, like) → category/vendor affinity scoring | `user_events` + pgvector embeddings, `recommend` Edge Function |
-| Reel ranking | Affinity + engagement + recency | Same signals, computed server-side |
-| Smart search | Intent parsing (price limits, "under 5000", synonyms, typo correction) over products/reels/streams | Postgres FTS + embeddings via `search` function |
-| Auto-tagging | Caption/file-name keyword matching against the vendor's catalog with confidence scores | Vision model on the uploaded frames |
-| Support chat | Rule-based intents (order status, shipping, returns, payment, product finder) | LLM with tool calls to order/product APIs |
-| Moderation | Risky-word + missing-tag heuristics → "AI safety score" | Vision + text moderation in `moderate-reel` |
+| Recommendations | Local category/vendor affinity, optionally reranked by Groq using supplied candidate products. |
+| Reel ranking | Local affinity/engagement/recency, optionally reranked by Groq using supplied reel summaries. |
+| Smart search | Local intent parsing, synonyms, price filters, typo correction; Groq optionally reranks the matching local candidate set. |
+| Auto-tagging | Groq selects from the current vendor's catalog; local caption/file-name scoring is fallback. |
+| Product content | Groq can draft factual product descriptions and discovery tags; local safe fallback remains. |
+| Support chat | Local account/order/policy intents first; Groq handles general questions without access to private order tools. |
+| Moderation | Local heuristics plus optional on-demand Groq decision support; it does not automatically approve/reject reels. |
+
+The browser calls only the same-origin `/api/ai` endpoint. When configured, `GROQ_API_KEY` is read from the Vercel server environment and is never sent to the client. Deployment environment values are not verifiable from this repository. Without the key/function, the app falls back to local behavior.
 
 ---
 
 ## 6. Key trade-offs
 
 1. **No framework / no build step.** Matches the brief and keeps onboarding trivial, at the cost of manual DOM updates and no type checking. Mitigated with small single-purpose modules and a strict page/service/component split.
-2. **Mock data layer instead of a live Supabase project.** Lets the whole UX be reviewed with zero setup; the price is that security (RLS) is *simulated* by the role guard — the client guard is UX only and must be backed by RLS.
+2. **Hybrid local and Supabase data.** Lets the UI remain demo-able when a hosted service is unavailable; the trade-off is local fallback data is not cross-device state, and client role guards are UX only.
 3. **`innerHTML` templating.** Fast to write and read; every dynamic string is escaped. A virtual DOM would be safer against mistakes but adds a dependency.
 4. **Multi-page app.** Simple and robust; loses cross-page state (solved with localStorage + storage events for cart/wishlist badges).
 5. **Reels as plain `<video>` + IntersectionObserver.** Only the visible reel plays; others are paused. Production should serve HLS renditions for adaptive bitrate.
@@ -140,9 +146,9 @@ Presence (viewer count) would use Supabase Realtime **Presence** on `stream:<id>
 
 ---
 
-## 7. Next Phase: Full Supabase Backend Blueprint & Execution Plan
+## 7. Backend readiness and deployment notes
 
-To take StreamCart from the demo phase to a 100% production-ready, free-tier deployable system on Supabase + Vercel, the backend is architected as follows:
+The following diagrams and tables describe the intended backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order, including `06_auth_order_hardening.sql` and `07_rls_recursion_fix.sql`; live orders previously returned PostgreSQL `42P17` until the RLS recursion fix is applied. No database migration is run automatically by the frontend deployment.
 
 ### 7.1 Architecture & Component Map
 
@@ -163,10 +169,10 @@ To take StreamCart from the demo phase to a 100% production-ready, free-tier dep
 │ 2. PostgreSQL (v15+)      │ 20+ Normalized relational tables           │
 │                           │ Check constraints & Foreign key cascades   │
 ├───────────────────────────┼────────────────────────────────────────────┤
-│ 3. Row Level Security     │ RBAC: Admin, Vendor (scoped), Customer     │
-│                           │ Zero leakage between vendors               │
+│ 3. Row Level Security     │ Role/vendor policies defined in migrations │
+│                           │ Verify deployed policy state before launch  │
 ├───────────────────────────┼────────────────────────────────────────────┤
-│ 4. Stored Procedures(RPC) │ Atomic Checkout (stock check + deduction)  │
+│ 4. Stored Procedures(RPC) │ SQL RPCs defined; checkout not wired to RPC │
 │                           │ Vendor Balance & Payout calculation        │
 │                           │ Live Stream Product Pinning & Metrics      │
 ├───────────────────────────┼────────────────────────────────────────────┤
@@ -212,9 +218,11 @@ To take StreamCart from the demo phase to a 100% production-ready, free-tier dep
 | `reels` | Read approved reels | Read approved + Like/Comment | Full CRUD on own reels | Moderate / Delete |
 | `live_streams` | Read live/scheduled | Read + Chat in stream | Full CRUD on own streams | Full CRUD |
 | `carts` / `wishlists` | None | Own rows only | Own rows only | Full CRUD |
-| `orders` | None | Read own orders; Create via RPC | Read orders containing own items | Full CRUD |
+| `orders` | None | Read own; insert own authenticated order | Read orders containing own items | Full CRUD |
 | `order_items` | None | Read items in own orders | Read & update own items only | Full CRUD |
 | `payouts` | None | None | Create & view own payouts | Approve / Reject / Pay |
+
+This matrix summarizes intended access, not a live database attestation. In the current SQL, vendor updates are ownership-scoped but not restricted by column; verify and harden sensitive vendor fields before production.
 
 ### 7.4 Implementation Roadmap
 
@@ -226,4 +234,5 @@ To take StreamCart from the demo phase to a 100% production-ready, free-tier dep
 - [x] **Phase 6: Stored Procedures & Business Logic (RPC)** (`supabase/migrations/05_rpc.sql`)
 - [x] **Phase 7: Comprehensive Demo Seed Data** (`supabase/seed.sql`)
 - [x] **Phase 8: Frontend Client Integration** (`assets/js/core/supabase.js` & service bridge)
+- [x] **Phase 9: Supabase Auth, Storage, Realtime and Groq AI proxy integration** (source implemented; production env/migrations still require deployment configuration)
 

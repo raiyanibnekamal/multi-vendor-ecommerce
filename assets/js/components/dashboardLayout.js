@@ -6,6 +6,8 @@ import { langToggleHtml } from '../core/i18n.js';
 import { db } from '../services/db.js';
 import { vendorOrdersSync } from '../services/orders.js';
 import { logoHtml } from './header.js';
+import { registerSW } from '../core/pwa.js';
+import { channel } from '../services/realtime.js';
 
 function vendorNav(vendor) {
   const pending = vendorOrdersSync(vendor.id).filter((o) => o.status === 'pending').length;
@@ -58,6 +60,9 @@ function adminNav() {
  * Returns null (and redirects) if the user is not allowed.
  */
 export function mountDashboard({ role, active, title }) {
+  registerSW();
+  channel('products');
+  channel('orders');
   const user = requireRole(role);
   if (!user) return null;
   const vendor = role === 'vendor' ? currentVendor() : null;

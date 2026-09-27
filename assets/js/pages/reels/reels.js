@@ -9,6 +9,7 @@ import { getReels, isLiked, isSaved, toggleLike, toggleSave, recordShare, record
 import { vendorSync, isFollowing, toggleFollow } from '../../services/vendors.js';
 import { rankReels, track } from '../../services/ai.js';
 import { db } from '../../services/db.js';
+import { resolveMediaUrl } from '../../services/storage.js';
 
 document.body.classList.add('reels-page');
 const main = mountShell({ active: 'reels', footer: false });
@@ -32,11 +33,12 @@ function productCardHtml(pid) {
 function reelHtml(r) {
   const v = vendorSync(r.vendorId);
   const following = isFollowing(v.id);
+  const videoUrl = r.resolvedVideoUrl || (r.videoUrl.startsWith('local-media:') ? '' : r.videoUrl);
   return `
   <section class="reel" data-reel="${r.id}">
     <div class="reel-stage">
       <div class="reel-progress"></div>
-      <video src="${r.videoUrl}" poster="${r.poster}" loop playsinline muted preload="metadata"></video>
+      <video ${videoUrl ? `src="${videoUrl}"` : ''} poster="${r.poster}" loop playsinline muted preload="metadata"></video>
       <div class="reel-top">
         <span class="badge" style="background:rgba(0,0,0,.4);color:#fff">${icon('eye')} ${formatNumber(r.views)}</span>
         <button class="glass" data-mute aria-label="Toggle sound">${icon(muted ? 'volume-x' : 'volume-2')}</button>
@@ -208,7 +210,8 @@ async function init() {
   main.innerHTML = `<div class="reels-feed">${loading()}</div>`;
   const all = await getReels();
   const startId = qs('id');
-  reels = rankReels(all);
+  const rankedReels = await rankReels(all);
+  reels = await Promise.all(rankedReels.map(async (reel) => ({ ...reel, resolvedVideoUrl: await resolveMediaUrl(reel.videoUrl) })));
   if (startId) {
     const i = reels.findIndex((r) => r.id === startId);
     if (i > 0) reels.unshift(...reels.splice(i, 1));

@@ -16,7 +16,7 @@ export async function getReels({ vendorId, status = 'approved' } = {}) {
   if (vendorId) list = list.filter((r) => r.vendorId === vendorId);
   const liveVendors = new Set(db.where('vendors', (v) => v.status === 'approved').map((v) => v.id));
   if (!vendorId && status === 'approved') list = list.filter((r) => liveVendors.has(r.vendorId));
-  return respond([...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  return respond([...list].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
 }
 
 export function reelSync(id) {
@@ -24,7 +24,7 @@ export function reelSync(id) {
 }
 
 export function reelsForProduct(productId) {
-  return db.where('reels', (r) => r.status === 'approved' && r.productIds.includes(productId));
+  return db.where('reels', (r) => r.status === 'approved' && Array.isArray(r.productIds) && r.productIds.includes(productId));
 }
 
 export const isLiked = (id) => inList('likedReels', id);
@@ -55,7 +55,7 @@ export async function getSavedReels() {
 }
 
 export async function getComments(reelId) {
-  return respond(db.where('reelComments', (c) => c.reelId === reelId && !c.flagged).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+  return respond(db.where('reelComments', (c) => c.reelId === reelId && !c.flagged).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
 }
 
 export async function addComment(reelId, text) {

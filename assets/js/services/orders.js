@@ -52,9 +52,9 @@ export async function placeOrder({ lines, address, paymentMethod, source = 'stor
     address,
     createdAt: new Date().toISOString(),
   };
+  await db.insertAndSync('orders', order);
   items.forEach((it) => db.update('products', it.productId, (p) => ({ stock: p.stock - it.qty, sold: p.sold + it.qty })));
-  db.insert('orders', order);
-  channel('orders').send('order:new', order);
+  channel('orders').send('order:new', order, { remote: false });
   return respond(order, 200);
 }
 
@@ -90,6 +90,6 @@ export async function updateOrderStatus(id, status) {
     status,
     paymentStatus: status === 'cancelled' ? (o.paymentStatus === 'paid' ? 'refunded' : 'unpaid') : status === 'delivered' ? 'paid' : o.paymentStatus,
   }));
-  channel('orders').send('order:update', order);
+  channel('orders').send('order:update', order, { remote: false });
   return respond(order);
 }

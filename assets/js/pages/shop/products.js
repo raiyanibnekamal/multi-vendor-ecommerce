@@ -4,6 +4,7 @@ import { routes } from '../../core/routes.js';
 import { escapeHtml, icon, $, formatPrice } from '../../core/utils.js';
 import { categoryTree, categoryPath, categoryById, getProducts, productCount } from '../../services/catalog.js';
 import { track } from '../../services/ai.js';
+import { t as tr } from '../../core/i18n.js';
 
 const main = mountShell({ active: 'products' });
 const params = Object.fromEntries(new URLSearchParams(location.search));
@@ -16,7 +17,7 @@ function treeHtml(nodes, lvl = 0) {
   const activePath = params.category ? categoryPath(params.category).map((c) => c.id) : [];
   return nodes.map((n) => {
     const open = activePath.includes(n.id) || lvl === 0;
-    return `<a class="lvl-${lvl} ${params.category === n.id ? 'active' : ''}" href="#" data-cat="${n.id}">${escapeHtml(n.name)} <span>${productCount(n.id)}</span></a>
+    return `<a class="lvl-${lvl} ${params.category === n.id ? 'active' : ''}" href="#" data-cat="${n.id}">${escapeHtml(tr(n.name))} <span>${productCount(n.id)}</span></a>
       ${n.children.length && open && (lvl === 0 ? activePath[0] === n.id : true) ? treeHtml(n.children, lvl + 1) : ''}`;
   }).join('');
 }
@@ -24,35 +25,35 @@ function treeHtml(nodes, lvl = 0) {
 function layout() {
   const cat = params.category ? categoryById(params.category) : null;
   const path = cat ? categoryPath(cat.id) : [];
-  const title = params.q ? `Results for "${escapeHtml(params.q)}"` : cat ? escapeHtml(cat.name) : params.onSale ? "Today's deals" : 'All products';
+  const title = params.q ? tr('Results for "{q}"', { q: params.q }) : cat ? tr(cat.name) : params.onSale ? tr("Today's deals") : tr('All products');
   main.innerHTML = `
   <div class="container page">
-    <nav class="breadcrumb"><a href="${routes.home()}">Home</a>${icon('chevron-right')}<a href="${routes.products()}">Shop</a>
-      ${path.map((c) => `${icon('chevron-right')}<a href="${routes.products({ category: c.id })}">${escapeHtml(c.name)}</a>`).join('')}</nav>
+    <nav class="breadcrumb"><a href="${routes.home()}">${tr('Home')}</a>${icon('chevron-right')}<a href="${routes.products()}">${tr('Shop')}</a>
+      ${path.map((c) => `${icon('chevron-right')}<a href="${routes.products({ category: c.id })}">${escapeHtml(tr(c.name))}</a>`).join('')}</nav>
     <div class="listing">
       <aside class="filters" data-filters>
-        <div class="row-between filter-toggle" style="padding-top:12px"><h3>Filters</h3><button class="close-btn" data-close-filters>${icon('x')}</button></div>
-        <div class="filter-group"><h4>Category</h4><div class="cat-tree"><a href="#" data-cat="" class="${!params.category ? 'active' : ''}">All products</a>${treeHtml(categoryTree())}</div></div>
-        <div class="filter-group"><h4>Price (৳)</h4>
-          <form class="price-inputs" data-price><input class="input" name="minPrice" type="number" placeholder="Min" value="${params.minPrice || ''}"><span class="muted">–</span><input class="input" name="maxPrice" type="number" placeholder="Max" value="${params.maxPrice || ''}"><button class="btn btn-soft btn-sm btn-icon">${icon('arrow-right')}</button></form>
+        <div class="row-between filter-toggle" style="padding-top:12px"><h3>${tr('Filters')}</h3><button class="close-btn" data-close-filters>${icon('x')}</button></div>
+        <div class="filter-group"><h4>${tr('Category')}</h4><div class="cat-tree"><a href="#" data-cat="" class="${!params.category ? 'active' : ''}">${tr('All products')}</a>${treeHtml(categoryTree())}</div></div>
+        <div class="filter-group"><h4>${tr('Price (৳)')}</h4>
+          <form class="price-inputs" data-price><input class="input" name="minPrice" type="number" placeholder="${tr('Min')}" value="${params.minPrice || ''}"><span class="muted">–</span><input class="input" name="maxPrice" type="number" placeholder="${tr('Max')}" value="${params.maxPrice || ''}"><button class="btn btn-soft btn-sm btn-icon">${icon('arrow-right')}</button></form>
           <div class="chips mt-1">${[[0, 1000], [1000, 5000], [5000, 20000], [20000, '']].map(([a, b]) => `<button class="chip" style="height:28px;font-size:12px" data-range="${a}-${b}">${b ? `${formatPrice(a)}–${formatPrice(b)}` : `${formatPrice(a)}+`}</button>`).join('')}</div>
         </div>
-        <div class="filter-group"><h4>Rating</h4>
-          ${[4, 3].map((r) => `<label class="check mb-1"><input type="radio" name="rating" value="${r}" ${params.rating == r ? 'checked' : ''}> ${r}★ & up</label><br>`).join('')}
-          <label class="check"><input type="radio" name="rating" value="" ${!params.rating ? 'checked' : ''}> Any</label>
+        <div class="filter-group"><h4>${tr('Rating')}</h4>
+          ${[4, 3].map((r) => `<label class="check mb-1"><input type="radio" name="rating" value="${r}" ${params.rating == r ? 'checked' : ''}> ${tr('{rating}★ & up', { rating: r })}</label><br>`).join('')}
+          <label class="check"><input type="radio" name="rating" value="" ${!params.rating ? 'checked' : ''}> ${tr('Any')}</label>
         </div>
-        <div class="filter-group"><h4>Availability</h4>
-          <label class="check mb-1"><input type="checkbox" data-flag="inStock" ${params.inStock ? 'checked' : ''}> In stock only</label><br>
-          <label class="check"><input type="checkbox" data-flag="onSale" ${params.onSale ? 'checked' : ''}> On sale (10%+ off)</label>
+        <div class="filter-group"><h4>${tr('Availability')}</h4>
+          <label class="check mb-1"><input type="checkbox" data-flag="inStock" ${params.inStock ? 'checked' : ''}> ${tr('In stock only')}</label><br>
+          <label class="check"><input type="checkbox" data-flag="onSale" ${params.onSale ? 'checked' : ''}> ${tr('On sale (10%+ off)')}</label>
         </div>
-        <button class="btn btn-outline btn-block mt-1" data-clear>Clear all filters</button>
+        <button class="btn btn-outline btn-block mt-1" data-clear>${tr('Clear all filters')}</button>
       </aside>
       <section>
         <div class="listing-bar">
-          <div><h1 style="font-size:24px">${title}</h1><span class="small muted" data-count></span></div>
+          <div><h1 style="font-size:24px">${escapeHtml(title)}</h1><span class="small muted" data-count></span></div>
           <div class="row">
-            <button class="btn btn-outline btn-sm filter-toggle" data-open-filters>${icon('sliders-horizontal')} Filters</button>
-            <select class="select" data-sort>${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${params.sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            <button class="btn btn-outline btn-sm filter-toggle" data-open-filters>${icon('sliders-horizontal')} ${tr('Filters')}</button>
+            <select class="select" data-sort>${Object.entries(SORTS).map(([k, v]) => `<option value="${k}" ${params.sort === k ? 'selected' : ''}>${tr(v)}</option>`).join('')}</select>
           </div>
         </div>
         <div class="active-filters" data-active></div>
@@ -68,16 +69,16 @@ function activeChips() {
   const chips = [];
   if (params.q) chips.push(['q', `"${params.q}"`]);
   if (params.minPrice || params.maxPrice) chips.push(['price', `${params.minPrice ? formatPrice(params.minPrice) : '৳0'} – ${params.maxPrice ? formatPrice(params.maxPrice) : 'any'}`]);
-  if (params.rating) chips.push(['rating', `${params.rating}★ & up`]);
-  if (params.inStock) chips.push(['inStock', 'In stock']);
-  if (params.onSale) chips.push(['onSale', 'On sale']);
+  if (params.rating) chips.push(['rating', tr('{rating}★ & up', { rating: params.rating })]);
+  if (params.inStock) chips.push(['inStock', tr('In stock')]);
+  if (params.onSale) chips.push(['onSale', tr('On sale')]);
   $('[data-active]').innerHTML = chips.map(([k, label]) => `<button class="chip active" data-remove="${k}">${escapeHtml(label)} ${icon('x')}</button>`).join('');
 }
 
 async function results() {
   $('[data-results]').innerHTML = loading();
   const res = await getProducts({ ...params, limit: 20 });
-  $('[data-count]').textContent = `${res.total} product${res.total === 1 ? '' : 's'}`;
+  $('[data-count]').textContent = tr('{count} products', { count: res.total });
   $('[data-results]').innerHTML = productGrid(res.items);
   const pages = $('[data-pages]');
   if (res.pages <= 1) { pages.innerHTML = ''; return; }

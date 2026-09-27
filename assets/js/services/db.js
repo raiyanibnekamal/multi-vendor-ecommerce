@@ -55,11 +55,23 @@ function persist(table) {
   store.set(tableKey(table), cache[table]);
 }
 
+function hasUuidCustomerId(row) {
+  return typeof row.customerId === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.customerId);
+}
+
+function insertLocal(table, row) {
+  load(table).unshift(row);
+  persist(table);
+  return row;
+}
+
 // Background sync from live Supabase
 async function syncFromSupabase() {
   if (CONFIG.USE_MOCK) return;
   const supabase = await getSupabase();
   if (!supabase) return;
+  const { data: authData } = await supabase.auth.getSession();
+  const hasSupabaseSession = Boolean(authData.session?.user);
 
   const tableMap = {
     categories: 'categories',
@@ -73,10 +85,15 @@ async function syncFromSupabase() {
   };
 
   for (const [appTable, pgTable] of Object.entries(tableMap)) {
+    if (appTable === 'orders' && !hasSupabaseSession) continue;
     try {
-      const query = appTable === 'orders' 
+      const query = appTable === 'orders'
         ? supabase.from('orders').select('*, items:order_items(*)').limit(200)
-        : supabase.from(pgTable).select('*').limit(200);
+        : appTable === 'reels'
+          ? supabase.from('reels').select('*, poster:poster_url, comments:comments_count, productIds:reel_products(product_id)').limit(200)
+          : appTable === 'streams'
+            ? supabase.from('live_streams').select('*, productIds:stream_products(product_id)').limit(200)
+          : supabase.from(pgTable).select('*').limit(200);
 
       const { data, error } = await query;
       if (!error && data && data.length > 0) {
@@ -84,6 +101,14 @@ async function syncFromSupabase() {
           const c = snakeToCamel(row);
           if (row.items && Array.isArray(row.items)) {
             c.items = row.items.map(snakeToCamel);
+          }
+          if (appTable === 'reels') {
+            c.productIds = Array.isArray(row.productIds) ? row.productIds.map((item) => item.product_id).filter(Boolean) : [];
+            c.poster = row.poster || c.posterUrl || '';
+            c.comments = row.comments ?? c.commentsCount ?? 0;
+          }
+          if (appTable === 'streams') {
+            c.productIds = Array.isArray(row.productIds) ? row.productIds.map((item) => item.product_id).filter(Boolean) : [];
           }
           return c;
         });
@@ -96,9 +121,11 @@ async function syncFromSupabase() {
   }
 }
 
+let initialSync = Promise.resolve();
+
 // Trigger initial sync if online & not mock
 if (typeof window !== 'undefined' && !CONFIG.USE_MOCK) {
-  syncFromSupabase();
+  initialSync = syncFromSupabase();
 }
 
 window.addEventListener('storage', (e) => {
@@ -106,48 +133,71 @@ window.addEventListener('storage', (e) => {
   if (e.key?.startsWith(prefix)) delete cache[e.key.slice(prefix.length)];
 });
 
+async function writeToSupabase(table, row) {
+  const supabase = await getSupabase();
+  if (!supabase) return;
+  if (table === 'orders') {
+    const { items, ...orderHeader } = row;
+    const sanitizedHeader = camelToSnake(orderHeader);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user || sanitizedHeader.customer_id !== authData.user.id) {
+      throw new Error('Order insert requires the matching authenticated Supabase customer.');
+    }
+    const { error: orderErr } = await supabase.from('orders').insert({ ...sanitizedHeader, customer_id: authData.user.id });
+    if (orderErr) throw orderErr;
+    if (Array.isArray(items) && items.length > 0) {
+      const orderItems = items.map((item) => ({
+        order_id: row.id,
+        product_id: item.productId,
+        vendor_id: item.vendorId,
+        title: item.title,
+        thumbnail: item.thumbnail,
+        price: item.price,
+        qty: item.qty,
+        status: 'pending',
+      }));
+      const { error: itemsErr } = await supabase.from('order_items').insert(orderItems);
+      if (itemsErr) throw itemsErr;
+    }
+    return;
+  }
+
+  if (table === 'streams') {
+    const { productIds = [], ...stream } = row;
+    const { error } = await supabase.from('live_streams').insert(camelToSnake(stream));
+    if (error) throw error;
+    if (productIds.length) {
+      const { error: productsError } = await supabase.from('stream_products').insert(
+        productIds.map((productId) => ({ stream_id: row.id, product_id: productId }))
+      );
+      if (productsError) throw productsError;
+    }
+    return;
+  }
+
+  const { error } = await supabase.from(table).insert(camelToSnake(row));
+  if (error) throw error;
+}
+
 export const db = {
   all: (table) => load(table),
   get: (table, id) => load(table).find((r) => r.id === id) || null,
   where: (table, fn) => load(table).filter(fn),
+  insertLocal,
   insert(table, row) {
-    load(table).unshift(row);
-    persist(table);
+    insertLocal(table, row);
 
-    if (!CONFIG.USE_MOCK) {
-      getSupabase().then(async (supabase) => {
-        if (!supabase) return;
-        if (table === 'orders') {
-          const { items, ...orderHeader } = row;
-          const { error: orderErr } = await supabase.from('orders').insert(camelToSnake(orderHeader));
-          if (orderErr) {
-            console.warn('[StreamCart] Supabase order insert failed:', orderErr);
-            return;
-          }
-          if (Array.isArray(items) && items.length > 0) {
-            const orderItems = items.map((it) => ({
-              order_id: row.id,
-              product_id: it.productId,
-              vendor_id: it.vendorId,
-              title: it.title,
-              thumbnail: it.thumbnail,
-              price: it.price,
-              qty: it.qty,
-              status: 'pending',
-            }));
-            await supabase.from('order_items').insert(orderItems).catch(console.warn);
-          }
-          return;
-        }
-
-        const pgTable = table === 'streams' ? 'live_streams' : table;
-        supabase.from(pgTable).insert(camelToSnake(row)).catch((err) => {
-          console.warn(`[StreamCart] Supabase insert failed for ${table}:`, err);
-        });
-      });
+    if (!CONFIG.USE_MOCK && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
+      writeToSupabase(table, row).catch((err) => console.warn(`[StreamCart] Supabase insert failed for ${table}:`, err));
     }
 
     return row;
+  },
+  async insertAndSync(table, row) {
+    if (!CONFIG.USE_MOCK && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
+      await writeToSupabase(table, row);
+    }
+    return insertLocal(table, row);
   },
   update(table, id, patch) {
     const row = db.get(table, id);
@@ -157,12 +207,28 @@ export const db = {
     persist(table);
 
     if (!CONFIG.USE_MOCK) {
-      getSupabase().then((supabase) => {
+      getSupabase().then(async (supabase) => {
         if (!supabase) return;
-        const pgTable = table === 'streams' ? 'live_streams' : table;
-        supabase.from(pgTable).update(camelToSnake(updated)).eq('id', id).catch((err) => {
+        const pgTable = table === 'streams' ? 'live_streams' : table === 'users' ? 'profiles' : table;
+        const payload = camelToSnake(updated);
+        const streamProductIds = table === 'streams' && Array.isArray(updated.productIds) ? updated.productIds : null;
+        if (table === 'streams') delete payload.product_ids;
+        if (Object.keys(payload).length) {
+          const { error } = await supabase.from(pgTable).update(payload).eq('id', id);
+          if (error) throw error;
+        }
+        if (streamProductIds) {
+          const { error: deleteError } = await supabase.from('stream_products').delete().eq('stream_id', id);
+          if (deleteError) throw deleteError;
+          if (streamProductIds.length) {
+            const { error: insertError } = await supabase.from('stream_products').insert(
+              streamProductIds.map((productId) => ({ stream_id: id, product_id: productId }))
+            );
+            if (insertError) throw insertError;
+          }
+        }
+      }).catch((err) => {
           console.warn(`[StreamCart] Supabase update failed for ${table}:`, err);
-        });
       });
     }
 
@@ -174,7 +240,7 @@ export const db = {
     if (i >= 0) rows.splice(i, 1);
     persist(table);
 
-    if (!CONFIG.USE_MOCK) {
+    if (!CONFIG.USE_MOCK && table !== 'users') {
       getSupabase().then((supabase) => {
         if (!supabase) return;
         const pgTable = table === 'streams' ? 'live_streams' : table;
@@ -188,6 +254,7 @@ export const db = {
     store.clearAll();
     Object.keys(cache).forEach((k) => delete cache[k]);
   },
+  waitForInitialSync: () => initialSync,
   syncNow: syncFromSupabase,
 };
 
