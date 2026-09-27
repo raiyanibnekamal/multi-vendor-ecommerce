@@ -1,0 +1,72 @@
+/* ---------- Live list ---------- */
+.live-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 28px; border-radius: var(--radius-xl); background: linear-gradient(135deg, #0f172a, #1e3a8a); color: #fff; margin-bottom: 24px; flex-wrap: wrap; }
+.live-hero p { color: #cbd5e1; margin-top: 6px; }
+.live-featured { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.live-featured > .live-card { align-self: start; }
+
+/* ---------- Watch page ---------- */
+body.watch-page { background: #0b0b0f; }
+.watch-page .topbar, .watch-page .cat-nav, .watch-page .mega { display: none !important; }
+.watch { display: grid; grid-template-columns: 1fr 380px; gap: 16px; padding: 16px 20px; max-width: 1500px; margin: 0 auto; height: calc(100vh - var(--header-h) - 1px); }
+.watch-left { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.player { position: relative; border-radius: 18px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; flex-shrink: 0; color: #fff; }
+.player video { width: 100%; height: 100%; object-fit: cover; }
+.player .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45), transparent 22%, transparent 60%, rgba(0,0,0,.6)); pointer-events: none; }
+.player-top { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; align-items: center; gap: 8px; z-index: 2; }
+.player-top .badge { height: 26px; font-size: 12px; }
+.player-top .glass { background: rgba(0,0,0,.45); color: #fff; backdrop-filter: blur(6px); }
+.player-top .right { margin-left: auto; display: flex; gap: 8px; }
+.player-top button.glass { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; }
+.pinned { position: absolute; left: 14px; bottom: 14px; z-index: 3; width: min(360px, calc(100% - 28px)); display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(255,255,255,.97); color: var(--text); border-radius: 16px; box-shadow: 0 12px 30px rgba(0,0,0,.35); animation: pop .35s var(--ease); }
+.pinned img { width: 64px; height: 64px; border-radius: 12px; background: var(--surface-2); object-fit: contain; flex-shrink: 0; }
+.pinned .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--live); text-transform: uppercase; letter-spacing: .04em; }
+.pinned .t { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.pinned .p { font-weight: 800; color: var(--primary); }
+.reactions-layer { position: absolute; right: 16px; bottom: 16px; width: 70px; height: 70%; pointer-events: none; z-index: 2; overflow: hidden; }
+.reaction { position: absolute; bottom: 0; font-size: 28px; animation: floatUp 2.6s ease-out forwards; }
+@keyframes floatUp { 0% { transform: translate(0, 0) scale(.6); opacity: 0; } 15% { opacity: 1; transform: translate(0, -20px) scale(1.1); } 100% { transform: translate(var(--dx, 0), -360px) scale(.9); opacity: 0; } }
+.buy-pop { position: absolute; left: 14px; top: 56px; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: rgba(22,163,74,.92); color: #fff; font-size: 13px; font-weight: 600; animation: pop .3s var(--ease); }
+.buy-pop .avatar { width: 24px; height: 24px; font-size: 10px; }
+.player-overlay { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; text-align: center; background: rgba(2,6,23,.75); backdrop-filter: blur(4px); padding: 20px; }
+.player-overlay .count { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; margin: 10px 0 16px; }
+
+.stream-info { display: flex; align-items: center; gap: 12px; color: #fff; flex-wrap: wrap; }
+.stream-info h1 { font-size: 20px; }
+.stream-info .muted { color: #9ca3af; }
+.stream-products { background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 16px; color: #fff; }
+.stream-products h3 { margin-bottom: 12px; }
+.sp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.sp-item { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: #1f2937; border: 1.5px solid transparent; }
+.sp-item.is-pinned { border-color: var(--live); }
+.sp-item img { width: 52px; height: 52px; border-radius: 10px; background: #fff; object-fit: contain; flex-shrink: 0; }
+.sp-item .t { font-size: 13px; line-height: 1.3; }
+.sp-item .p { font-weight: 800; color: #93c5fd; font-size: 14px; }
+
+.chat { display: flex; flex-direction: column; background: #111827; border: 1px solid #1f2937; border-radius: 18px; overflow: hidden; color: #e5e7eb; min-height: 0; }
+.chat-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #1f2937; }
+.chat-msgs { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; scrollbar-width: thin; scrollbar-color: #374151 transparent; }
+.chat-msg { display: flex; gap: 8px; font-size: 13.5px; line-height: 1.4; animation: fadeIn .2s; }
+.chat-msg .avatar { width: 26px; height: 26px; font-size: 10px; }
+.chat-msg b { color: #93c5fd; margin-right: 4px; font-weight: 600; }
+.chat-msg.host b { color: #fca5a5; }
+.chat-msg.host .host-tag { background: var(--live); color: #fff; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
+.chat-msg.system { color: #86efac; font-size: 12.5px; justify-content: center; }
+.chat-msg.me b { color: #fde68a; }
+.chat-react { display: flex; gap: 6px; padding: 8px 12px 0; }
+.chat-react button { flex: 1; height: 38px; border-radius: 10px; background: #1f2937; font-size: 18px; transition: transform .1s, background .15s; }
+.chat-react button:hover { background: #374151; }
+.chat-react button:active { transform: scale(.9); }
+.chat-form { display: flex; gap: 8px; padding: 12px; }
+.chat-form input { flex: 1; height: 42px; border-radius: 999px; border: 1.5px solid #374151; background: #0b0b0f; color: #fff; padding: 0 16px; outline: none; }
+.chat-form input:focus { border-color: var(--primary); }
+.chat-form button { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; }
+
+@media (max-width: 1000px) {
+  .live-featured { grid-template-columns: 1fr; }
+  .watch { grid-template-columns: 1fr; height: auto; padding: 0 0 16px; }
+  .watch-page .site-header { position: static; }
+  .player { border-radius: 0; aspect-ratio: 9 / 12; }
+  .stream-info, .stream-products { margin: 0 12px; }
+  .chat { height: 460px; margin: 0 12px; }
+  .watch-page .ai-fab { display: none; }
+}

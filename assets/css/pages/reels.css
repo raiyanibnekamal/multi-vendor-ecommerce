@@ -1,0 +1,80 @@
+body.reels-page { background: #000; }
+.reels-page .topbar, .reels-page .cat-nav, .reels-page .mega { display: none !important; }
+.reels-page .site-header { background: #0b0b0f; border-color: #1f2937; }
+.reels-page .site-header .logo, .reels-page .site-header .icon-btn { color: #e5e7eb; }
+.reels-page .site-header .icon-btn:hover { background: #1f2937; }
+.reels-page .header-search form { background: #1f2937; }
+.reels-page .header-search input { color: #fff; }
+
+.reels-feed { height: calc(100vh - var(--header-h) - 1px); overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+.reels-feed::-webkit-scrollbar { display: none; }
+.reel { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; justify-content: center; align-items: center; gap: 18px; padding: 16px 0; }
+.reel-stage { position: relative; height: 100%; aspect-ratio: 9 / 16; max-width: 100%; border-radius: 18px; overflow: hidden; background: #111; color: #fff; }
+.reel-stage video { width: 100%; height: 100%; object-fit: cover; background: #111; }
+.reel-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, transparent 18%, transparent 50%, rgba(0,0,0,.85) 100%); }
+.reel-top { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 2; display: flex; justify-content: space-between; align-items: center; }
+.reel-top .glass { width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); color: #fff; display: grid; place-items: center; }
+.reel-progress { position: absolute; top: 0; left: 0; height: 3px; background: #fff; z-index: 3; width: 0; transition: width .2s linear; }
+.reel-paused { position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.reel-paused span { width: 72px; height: 72px; border-radius: 50%; background: rgba(0,0,0,.45); display: grid; place-items: center; }
+.reel-paused svg { width: 32px; height: 32px; }
+.reel.is-paused .reel-paused { opacity: 1; }
+.heart-burst { position: absolute; z-index: 4; pointer-events: none; color: #ef4444; animation: burst .8s ease forwards; }
+.heart-burst svg { width: 96px; height: 96px; fill: currentColor; }
+@keyframes burst { 0% { transform: translate(-50%, -50%) scale(.4); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -80%) scale(1); opacity: 0; } }
+
+.reel-bottom { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.reel-author { display: flex; align-items: center; gap: 10px; }
+.reel-author a { font-weight: 700; font-size: 15px; }
+.reel-author .follow { height: 28px; padding: 0 12px; border-radius: 8px; border: 1.5px solid rgba(255,255,255,.8); font-size: 12.5px; font-weight: 700; color: #fff; }
+.reel-author .follow.on { background: rgba(255,255,255,.2); border-color: transparent; }
+.reel-caption { font-size: 14px; line-height: 1.4; max-width: 92%; }
+.reel-products { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.reel-products::-webkit-scrollbar { display: none; }
+.reel-product { flex: 0 0 auto; width: min(100%, 290px); display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(255,255,255,.96); color: var(--text); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: pop .35s var(--ease); }
+.reel-products.multi .reel-product { width: 240px; }
+.reel-products.multi .reel-product .lbl { display: none; }
+.reel-products.multi .reel-product .btn { width: 38px; padding: 0; }
+.reel-product img { width: 52px; height: 52px; border-radius: 10px; background: var(--surface-2); object-fit: contain; flex-shrink: 0; }
+.reel-product .t { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.reel-product .p { font-size: 14px; font-weight: 800; color: var(--primary); }
+.reel-product .p s { color: var(--muted-2); font-weight: 500; font-size: 12px; margin-left: 4px; }
+.reel-product .btn { height: 34px; padding: 0 12px; font-size: 12.5px; border-radius: 9px; flex-shrink: 0; }
+
+.reel-actions { display: flex; flex-direction: column; gap: 14px; align-items: center; align-self: flex-end; padding-bottom: 20px; }
+.reel-act { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #e5e7eb; font-size: 12px; font-weight: 600; }
+.reel-act .c { width: 50px; height: 50px; border-radius: 50%; background: #1f2937; display: grid; place-items: center; transition: transform .15s, background .15s; }
+.reel-act:hover .c { background: #374151; }
+.reel-act:active .c { transform: scale(.9); }
+.reel-act svg { width: 24px; height: 24px; }
+.reel-act.liked .c { color: #ef4444; }
+.reel-act.liked svg, .reel-act.saved svg { fill: currentColor; }
+.reel-act.saved .c { color: #facc15; }
+.reel-act.shop .c { background: var(--gradient); color: #fff; }
+
+.reels-nav { position: fixed; right: 28px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 20; }
+.reels-nav button { width: 46px; height: 46px; border-radius: 50%; background: #1f2937; color: #fff; display: grid; place-items: center; }
+.reels-nav button:hover { background: #374151; }
+.reels-hint { position: fixed; left: 24px; bottom: 24px; color: #6b7280; font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.reels-hint .kbd { border-color: #374151; color: #9ca3af; }
+
+.comments-list { display: flex; flex-direction: column; gap: 14px; }
+.comment { display: flex; gap: 10px; }
+.comment b { font-size: 13px; }
+.comment p { font-size: 14px; }
+
+@media (max-width: 900px) {
+  body.reels-page { padding-bottom: 0 !important; }
+  .reels-page .site-header { display: none; }
+  .reels-page .bottom-nav { background: #000; border-color: #1f2937; }
+  .reels-page .bottom-nav a { color: #9ca3af; }
+  .reels-page .bottom-nav a.active { color: #fff; }
+  .reels-feed { height: calc(100dvh - 62px); }
+  .reel { padding: 0; }
+  .reel-stage { border-radius: 0; width: 100%; aspect-ratio: auto; }
+  .reel-actions { position: absolute; right: 8px; bottom: 150px; z-index: 5; padding: 0; }
+  .reel-act .c { background: rgba(0,0,0,.35); backdrop-filter: blur(6px); width: 46px; height: 46px; }
+  .reel-bottom { padding-right: 70px; }
+  .reels-nav, .reels-hint, .reels-page .ai-fab { display: none; }
+  .reel { position: relative; }
+}
