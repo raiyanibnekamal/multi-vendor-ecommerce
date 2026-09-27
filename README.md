@@ -1,8 +1,16 @@
-# StreamCart — Watch. Shop. Live.
+# StreamCart | Watch. Shop. Live.
 
-[Open the deployed app](https://multi-vendor-ecommerce-ten.vercel.app/)
+[**Visit the live app →**](https://multi-vendor-ecommerce-ten.vercel.app/)
 
-StreamCart is a multi-vendor marketplace where customers shop from short videos and live streams. It is a vanilla HTML/CSS/JavaScript multi-page app, with Supabase for configured live data and Vercel serverless functions for Groq-backed AI. See [Architecture](docs/ARCHITECTURE.md), [Audit and roadmap](docs/AUDIT_AND_ROADMAP.md), and the [Supabase backend guide](supabase/README.md).
+## About StreamCart
+
+StreamCart is a multi-vendor social-commerce marketplace that brings product discovery and shopping together. Customers can browse stores, shop products featured in short videos, and explore live-shopping experiences from one place.
+
+Vendors get tools to manage products, orders, reels, and live sessions. Platform admins can review vendors and products, moderate content, manage disputes, and oversee marketplace activity.
+
+The project is built with HTML, CSS, and vanilla JavaScript. Supabase powers configured authentication and marketplace data; optional Groq AI features run through a Vercel serverless endpoint, with local fallbacks for demo use. Payment-provider processing and production live-video transport are not yet integrated.
+
+Explore the [architecture](docs/ARCHITECTURE.md), [project audit and roadmap](docs/AUDIT_AND_ROADMAP.md), and [Supabase setup guide](supabase/README.md).
 
 ## 🚀 Latest Updates
 
