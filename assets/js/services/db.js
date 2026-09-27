@@ -74,9 +74,19 @@ async function syncFromSupabase() {
 
   for (const [appTable, pgTable] of Object.entries(tableMap)) {
     try {
-      const { data, error } = await supabase.from(pgTable).select('*').limit(200);
+      const query = appTable === 'orders' 
+        ? supabase.from('orders').select('*, items:order_items(*)').limit(200)
+        : supabase.from(pgTable).select('*').limit(200);
+
+      const { data, error } = await query;
       if (!error && data && data.length > 0) {
-        const camelData = data.map(snakeToCamel);
+        const camelData = data.map((row) => {
+          const c = snakeToCamel(row);
+          if (row.items && Array.isArray(row.items)) {
+            c.items = row.items.map(snakeToCamel);
+          }
+          return c;
+        });
         cache[appTable] = camelData;
         persist(appTable);
       }
@@ -105,8 +115,31 @@ export const db = {
     persist(table);
 
     if (!CONFIG.USE_MOCK) {
-      getSupabase().then((supabase) => {
+      getSupabase().then(async (supabase) => {
         if (!supabase) return;
+        if (table === 'orders') {
+          const { items, ...orderHeader } = row;
+          const { error: orderErr } = await supabase.from('orders').insert(camelToSnake(orderHeader));
+          if (orderErr) {
+            console.warn('[StreamCart] Supabase order insert failed:', orderErr);
+            return;
+          }
+          if (Array.isArray(items) && items.length > 0) {
+            const orderItems = items.map((it) => ({
+              order_id: row.id,
+              product_id: it.productId,
+              vendor_id: it.vendorId,
+              title: it.title,
+              thumbnail: it.thumbnail,
+              price: it.price,
+              qty: it.qty,
+              status: 'pending',
+            }));
+            await supabase.from('order_items').insert(orderItems).catch(console.warn);
+          }
+          return;
+        }
+
         const pgTable = table === 'streams' ? 'live_streams' : table;
         supabase.from(pgTable).insert(camelToSnake(row)).catch((err) => {
           console.warn(`[StreamCart] Supabase insert failed for ${table}:`, err);

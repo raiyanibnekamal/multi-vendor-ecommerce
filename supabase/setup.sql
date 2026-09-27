@@ -659,15 +659,27 @@ CREATE POLICY "Users can manage own wishlist"
   WITH CHECK (auth.uid() = user_id);
 
 -- 11. ORDERS & ORDER ITEMS
+CREATE OR REPLACE FUNCTION public.order_has_vendor_item(p_order_id TEXT, p_vendor_id TEXT)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.order_items 
+    WHERE order_id = p_order_id AND vendor_id = p_vendor_id
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_order_customer(p_order_id TEXT, p_user_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.orders 
+    WHERE id = p_order_id AND customer_id = p_user_id
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
 CREATE POLICY "Customers can view own orders"
   ON public.orders FOR SELECT
   USING (
     auth.uid() = customer_id 
-    OR EXISTS (
-      SELECT 1 FROM public.order_items 
-      WHERE order_items.order_id = orders.id 
-      AND order_items.vendor_id = public.get_my_vendor_id()
-    )
+    OR public.order_has_vendor_item(orders.id, public.get_my_vendor_id())
     OR public.is_admin()
   );
 
@@ -675,10 +687,7 @@ CREATE POLICY "Order items viewable by customer, vendor or admin"
   ON public.order_items FOR SELECT
   USING (
     vendor_id = public.get_my_vendor_id()
-    OR EXISTS (
-      SELECT 1 FROM public.orders 
-      WHERE orders.id = order_items.order_id AND orders.customer_id = auth.uid()
-    )
+    OR public.is_order_customer(order_items.order_id, auth.uid())
     OR public.is_admin()
   );
 
