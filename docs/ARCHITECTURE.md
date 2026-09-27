@@ -138,6 +138,92 @@ Presence (viewer count) would use Supabase Realtime **Presence** on `stream:<id>
 
 ---
 
-## 7. What's intentionally out of scope (frontend-only phase)
+---
 
-Real authentication, payments, video transport, email/SMS notifications and server-side AI. Each has a clearly marked seam: `core/auth.js`, `services/orders.js#placeOrder`, `pages/vendor/go-live.js#startCamera`, `services/ai.js`.
+## 7. Next Phase: Full Supabase Backend Blueprint & Execution Plan
+
+To take StreamCart from the demo phase to a 100% production-ready, free-tier deployable system on Supabase + Vercel, the backend is architected as follows:
+
+### 7.1 Architecture & Component Map
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Client Layer (Vercel)                           │
+│  Storefront  │  Reels  │  Live Studio  │  Vendor Dash  │  Admin Dash   │
+└───────────────────────────┬────────────────────────────────────────────┘
+                            │
+              @supabase/supabase-js (Browser SDK)
+                            │
+┌───────────────────────────▼────────────────────────────────────────────┐
+│                    Supabase Backend (Free Tier)                         │
+├───────────────────────────┬────────────────────────────────────────────┤
+│ 1. Supabase Auth          │ Email/password + Role metadata             │
+│                           │ Trigger creates public.profiles automatically│
+├───────────────────────────┼────────────────────────────────────────────┤
+│ 2. PostgreSQL (v15+)      │ 20+ Normalized relational tables           │
+│                           │ Check constraints & Foreign key cascades   │
+├───────────────────────────┼────────────────────────────────────────────┤
+│ 3. Row Level Security     │ RBAC: Admin, Vendor (scoped), Customer     │
+│                           │ Zero leakage between vendors               │
+├───────────────────────────┼────────────────────────────────────────────┤
+│ 4. Stored Procedures(RPC) │ Atomic Checkout (stock check + deduction)  │
+│                           │ Vendor Balance & Payout calculation        │
+│                           │ Live Stream Product Pinning & Metrics      │
+├───────────────────────────┼────────────────────────────────────────────┤
+│ 5. Supabase Realtime      │ Broadcast: Live chat, reactions, pin card  │
+│                           │ Postgres Changes: Orders & Vendor alerts   │
+├───────────────────────────┼────────────────────────────────────────────┤
+│ 6. Supabase Storage       │ Buckets: product-images, reels, avatars    │
+│                           │ Public read + Vendor-authenticated write   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.2 Core Database Entities (20+ Tables)
+
+1. **`profiles`** - User accounts extending `auth.users` (role: `admin`, `vendor`, `customer`).
+2. **`vendors`** - Vendor stores, slug, commission rate, balance, rating, verification status.
+3. **`categories`** - Multi-level category hierarchy (`parent_id`).
+4. **`products`** - Products catalog with pricing, stock, category, tags, and rating.
+5. **`product_images`** - Multi-image gallery per product with display order.
+6. **`reels`** - Video feed posts with video/poster URLs, status, view/like counters.
+7. **`reel_products`** - Many-to-many product tagging in reels for instant in-video purchase.
+8. **`reel_likes`**, **`reel_comments`**, **`reel_saves`** - Engagement tracking with auto-trigger counters.
+9. **`live_streams`** - Scheduled and active live selling broadcasts with viewer tracking.
+10. **`stream_products`** - Products featured in a live stream.
+11. **`stream_messages`** - Realtime and persisted live stream chat history.
+12. **`carts`** & **`wishlists`** - Customer cart items & saved products.
+13. **`orders`** - Main order headers with payment status, delivery address, subtotal, discount, source (`store`, `reel`, `live`).
+14. **`order_items`** - Items split by vendor for isolated fulfillment and commission tracking.
+15. **`payouts`** - Vendor withdrawal requests and admin approval workflow.
+16. **`disputes`** - Customer complaints, status tracking, and admin resolution.
+17. **`conversations`** & **`messages`** - Vendor-customer direct messaging.
+18. **`follows`** - Customer following vendors for stream & reel notifications.
+19. **`user_events`** - Event log for AI recommendation and analytics.
+20. **`reviews`** - Product ratings and verified purchase reviews.
+
+### 7.3 Security (RLS) Matrix
+
+| Table | Anonymous / Public | Customer | Vendor | Admin |
+|---|---|---|---|---|
+| `profiles` | Read vendor profile info | Read/Update own profile | Read/Update own profile | Full CRUD |
+| `vendors` | Read approved vendors | Read approved vendors | Update own store details | Full CRUD |
+| `categories` | Read all | Read all | Read all | Full CRUD |
+| `products` | Read active products | Read active products | Full CRUD on own products | Full CRUD |
+| `reels` | Read approved reels | Read approved + Like/Comment | Full CRUD on own reels | Moderate / Delete |
+| `live_streams` | Read live/scheduled | Read + Chat in stream | Full CRUD on own streams | Full CRUD |
+| `carts` / `wishlists` | None | Own rows only | Own rows only | Full CRUD |
+| `orders` | None | Read own orders; Create via RPC | Read orders containing own items | Full CRUD |
+| `order_items` | None | Read items in own orders | Read & update own items only | Full CRUD |
+| `payouts` | None | None | Create & view own payouts | Approve / Reject / Pay |
+
+### 7.4 Implementation Roadmap
+
+- [x] **Phase 1: Architecture & Design Alignment** (this document)
+- [x] **Phase 2: Database Schema & DDL Scripts** (`supabase/migrations/01_schema.sql`)
+- [x] **Phase 3: Security & Row Level Security (RLS)** (`supabase/migrations/02_rls.sql`)
+- [x] **Phase 4: Storage Buckets & Policies** (`supabase/migrations/03_storage.sql`)
+- [x] **Phase 5: Realtime Replication Setup** (`supabase/migrations/04_realtime.sql`)
+- [x] **Phase 6: Stored Procedures & Business Logic (RPC)** (`supabase/migrations/05_rpc.sql`)
+- [x] **Phase 7: Comprehensive Demo Seed Data** (`supabase/seed.sql`)
+- [x] **Phase 8: Frontend Client Integration** (`assets/js/core/supabase.js` & service bridge)
+
