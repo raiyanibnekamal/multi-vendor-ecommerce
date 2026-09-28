@@ -323,8 +323,32 @@ export async function register({ name, email, password, phone, role, storeName, 
     options: { data: { name, role, phone, storeName, storeCategory } },
   });
   if (error) throw new Error(error.message || 'Could not create your account.');
-  if (!data.user || !data.session) {
-    throw new Error('Account created. Check your email to confirm it, then sign in.');
+  if (!data.user) throw new Error('Could not create your account.');
+
+  if (!data.session) {
+    const createdAt = data.user.created_at || new Date().toISOString();
+    const localUser = {
+      id: data.user.id,
+      name,
+      email: email.trim().toLowerCase(),
+      phone,
+      role,
+      status: 'active',
+      joinedAt: createdAt,
+      addresses: [],
+    };
+    if (role === 'vendor') {
+      const vendor = {
+        id: uid('v'), name: storeName, slug: storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ownerId: localUser.id,
+        ownerName: name, email: localUser.email, phone, location: 'Dhaka', color: '#2563eb',
+        description: `${storeName} — ${storeCategory || 'General store'}`, status: 'pending', verified: false,
+        rating: 0, followers: 0, joinedAt: createdAt, commissionRate: 10, balance: 0,
+      };
+      db.insertLocal('vendors', vendor);
+      localUser.vendorId = vendor.id;
+    }
+    db.insertLocal('users', localUser);
+    return startSession(localUser);
   }
 
   const user = await syncAuthUser(supabase, data.user);

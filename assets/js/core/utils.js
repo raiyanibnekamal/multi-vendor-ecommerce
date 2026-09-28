@@ -32,6 +32,31 @@ export function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+export function fallbackMediaUrl(label = 'Image', { width = 900, height = 900, bg = '#111827', fg = '#f8fafc' } = {}) {
+  const safeLabel = String(label || 'Image').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#1f2937" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#g)" rx="32"/>
+      <circle cx="${width * 0.5}" cy="${height * 0.38}" r="${Math.min(width, height) * 0.17}" fill="${bg}" opacity="0.92"/>
+      <path d="M${width * 0.28} ${height * 0.45} L${width * 0.72} ${height * 0.45} L${width * 0.6} ${height * 0.68} L${width * 0.4} ${height * 0.68} Z" fill="${fg}" opacity="0.15"/>
+      <text x="50%" y="57%" text-anchor="middle" fill="${fg}" font-size="${Math.max(34, Math.min(width, height) * 0.06)}" font-family="Segoe UI, Arial, sans-serif" font-weight="700">${safeLabel.slice(0, 18)}</text>
+      <text x="50%" y="67%" text-anchor="middle" fill="${fg}" opacity="0.75" font-size="${Math.max(18, Math.min(width, height) * 0.03)}" font-family="Segoe UI, Arial, sans-serif">No image available</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+export function safeMediaUrl(url, fallbackLabel = 'Image', fallbackColors) {
+  if (typeof url === 'string' && url.trim()) return url;
+  return fallbackMediaUrl(fallbackLabel, fallbackColors);
+}
+
 export function formatPrice(n) {
   return `${CONFIG.CURRENCY}${digits(Math.round(n).toLocaleString('en-IN'))}`;
 }

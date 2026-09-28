@@ -1,5 +1,5 @@
 // StreamCart PWA Service Worker
-const CACHE_NAME = 'streamcart-v6-2026-09-28';
+const CACHE_NAME = 'streamcart-v8-2026-09-28-fix';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -68,6 +68,12 @@ async function networkFirst(request, useIndexFallback = false) {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
+
+  // JavaScript must always come from the current deployment; stale modules break the app after updates.
+  if (url.origin === location.origin && (url.pathname.endsWith('.js') || event.request.destination === 'script')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // Never cache authenticated API responses or requests carrying API keys.
   if (url.origin !== location.origin && (event.request.headers.has('authorization') || event.request.headers.has('apikey'))) return;

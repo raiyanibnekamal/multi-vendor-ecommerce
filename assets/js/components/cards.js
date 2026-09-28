@@ -1,4 +1,4 @@
-import { escapeHtml, formatPrice, formatNumber, avatar, timeUntil, icon } from '../core/utils.js';
+import { escapeHtml, formatPrice, formatNumber, avatar, timeUntil, icon, safeMediaUrl } from '../core/utils.js';
 import { routes } from '../core/routes.js';
 import { db } from '../services/db.js';
 import { addToCart, inWishlist, toggleWishlist } from '../services/cart.js';
@@ -15,7 +15,7 @@ export function productCard(p) {
   return `
   <article class="p-card ${p.stock <= 0 ? 'out' : ''}">
     <a class="thumb" href="${routes.product(p.id)}">
-      <img src="${p.thumbnail}" alt="${escapeHtml(p.title)}" loading="lazy">
+      <img src="${safeMediaUrl(p.thumbnail, p.title)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', p.title)}'">
       <div class="badges">
         ${p.discount >= 5 ? `<span class="badge badge-sale">-${p.discount}%</span>` : ''}
         ${p.stock > 0 && p.stock <= 5 ? `<span class="badge badge-warning">Only ${p.stock} left</span>` : ''}
@@ -41,9 +41,13 @@ export function productGrid(list, empty = 'No products found') {
 
 export function reelThumb(r) {
   const v = db.get('vendors', r.vendorId);
+  const product = db.get('products', Array.isArray(r.productIds) ? r.productIds[0] : null);
+  const productImage = product?.thumbnail || '';
+  const poster = safeMediaUrl(productImage || r.poster, product?.title || r.caption || 'Reel preview');
+  const fallback = safeMediaUrl(productImage, product?.title || r.caption || 'Reel preview');
   return `
   <a class="reel-thumb" href="${routes.reels(r.id)}">
-    <img src="${r.poster}" alt="" loading="lazy">
+    <img src="${poster}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'">
     <div class="top"><span class="row" style="gap:4px">${icon('play')} ${formatNumber(r.views)}</span><span class="badge" style="background:rgba(0,0,0,.45);color:#fff">${icon('shopping-bag')} ${r.productIds.length}</span></div>
     <div class="play"><span>${icon('play')}</span></div>
     <div class="bottom"><p class="clamp-2">${escapeHtml(r.caption)}</p><span class="xs" style="opacity:.8">@${escapeHtml(v?.slug || '')}</span></div>
@@ -58,9 +62,10 @@ export function liveCard(s) {
     : s.status === 'scheduled'
       ? `<span class="badge badge-dark">${icon('clock')} in ${timeUntil(s.scheduledAt)}</span>`
       : `<span class="badge badge-dark">Replay</span>`;
+  const thumb = safeMediaUrl(s.thumbnail, s.title || 'Live stream');
   return `
   <a class="live-card" href="${routes.watch(s.id)}">
-    <div class="thumb"><img src="${s.thumbnail}" alt="" loading="lazy"><div class="tl">${tag}</div></div>
+    <div class="thumb"><img src="${thumb}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', s.title || 'Live stream')}'"><div class="tl">${tag}</div></div>
     <div class="body">
       ${avatar(v?.name || '?', { size: 'sm', color: v?.color })}
       <div class="grow"><h4 class="clamp-2" style="font-size:14px">${escapeHtml(s.title)}</h4><span class="xs muted">${escapeHtml(v?.name || '')} · ${productCount} products</span></div>

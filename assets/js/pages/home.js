@@ -1,8 +1,8 @@
 import { mountShell } from '../components/shell.js';
-import { productCard, reelThumb, liveCard, vendorCard, skeletonHome, priceHtml } from '../components/cards.js';
+import { productCard, reelThumb, liveCard, vendorCard, skeletonHome, priceHtml } from '../components/cards.js?v=20260928-5';
 import { toast } from '../components/toast.js';
 import { routes } from '../core/routes.js';
-import { escapeHtml, icon, formatPrice, formatNumber, stars, avatar, digits, t } from '../core/utils.js';
+import { escapeHtml, icon, formatPrice, formatNumber, stars, avatar, digits, t, safeMediaUrl } from '../core/utils.js';
 import { categoryTree, descendantIds, getProducts } from '../services/catalog.js';
 import { getReels } from '../services/reels.js';
 import { getStreams } from '../services/live.js';
@@ -36,17 +36,19 @@ function heroPhone(reel) {
   if (!reel) return '';
   const p = db.get('products', reel.productIds[0]);
   const v = db.get('vendors', reel.vendorId);
+  const poster = safeMediaUrl(p?.thumbnail || reel.poster, p?.title || reel.caption || 'Featured reel');
+  const heroProductImage = safeMediaUrl(p?.thumbnail, p?.title || 'Featured product');
   return `
     <div class="hero-visual" aria-hidden="true">
       <div class="phone">
-        <video ${reel.videoUrl ? `src="${reel.videoUrl}"` : ''} poster="${reel.poster}" muted autoplay loop playsinline preload="metadata"></video>
+        <video ${reel.videoUrl ? `src="${reel.videoUrl}"` : ''} poster="${poster}" muted autoplay loop playsinline preload="metadata" onerror="this.poster='${poster}'"></video>
         <div class="phone-ui">
           <div class="row" style="gap:8px">${avatar(v?.name || '', { size: 'sm', color: v?.color })}<b class="small">@${escapeHtml(v?.slug || '')}</b></div>
           <p class="xs clamp-2">${escapeHtml(reel.caption)}</p>
         </div>
       </div>
       ${p ? `<a class="float-card float-product" href="${routes.product(p.id)}" tabindex="-1">
-        <img src="${p.thumbnail}" alt="">
+        <img src="${heroProductImage}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', p.title || 'Featured product')}'">
         <div style="min-width:0"><div class="xs bold truncate">${escapeHtml(p.title)}</div>${priceHtml(p)}</div>
         <span class="btn btn-primary btn-xs">${t('Buy now')}</span>
       </a>` : ''}
@@ -93,14 +95,14 @@ async function render() {
       <div class="hero-side">
         ${live[0] ? `
         <a class="hero-tile" href="${routes.watch(live[0].id)}">
-          <img src="${live[0].thumbnail}" alt="">
+          <img src="${safeMediaUrl(live[0].thumbnail, live[0].title || 'Live stream')}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', live[0].title || 'Live stream')}'">
           <span class="badge badge-live" style="width:fit-content">LIVE</span>
           <h3 class="mt-1">${escapeHtml(live[0].title)}</h3>
           <span class="small" style="opacity:.85">${escapeHtml(db.get('vendors', live[0].vendorId)?.name || '')} · ${t('Tap to join')}</span>
         </a>` : ''}
         ${heroDeal ? `
         <a class="hero-tile light" href="${routes.products({ onSale: 1, sort: 'discount' })}">
-          <img src="${heroDeal.thumbnail}" alt="">
+          <img src="${safeMediaUrl(heroDeal.thumbnail, heroDeal.title || 'Flash deal')}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', heroDeal.title || 'Flash deal')}'">
           <span class="badge badge-sale" style="width:fit-content">${t('Up to {n}% off', { n: digits(heroDeal.discount) })}</span>
           <h3 class="mt-1" style="max-width:55%">${t("Today's flash deals")}</h3>
           <span class="small text-primary bold">${t('Shop deals')} →</span>
@@ -122,7 +124,7 @@ async function render() {
           const [bg, fg] = CAT_STYLE[c.id] || ['#e0e7ff', '#4338ca'];
           return `<a class="cat-tile" href="${routes.products({ category: c.id })}" style="--cat-bg:${bg};--cat-fg:${fg}">
             <div><b>${escapeHtml(t(c.name))}</b><span>${t('{n} sub-categories', { n: digits(c.children.length) })}</span></div>
-            <img src="${categoryImage(c.id) || ''}" alt="" loading="lazy">
+            <img src="${safeMediaUrl(categoryImage(c.id), c.name || 'Category')}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', c.name || 'Category')}'">
           </a>`;
         }).join('')}
       </div>
@@ -172,11 +174,11 @@ async function render() {
     <section class="section reveal promo-grid">
       <a class="promo promo-a" href="${routes.products({ category: 'fashion' })}">
         <div><span class="badge">${t('New season')}</span><h3>${t('Fashion week')}</h3><p>${t('Fresh styles from top local brands')}</p><span class="btn btn-white btn-sm">${t('Shop fashion')}</span></div>
-        <img src="${categoryImage('fashion') || ''}" alt="" loading="lazy">
+        <img src="${safeMediaUrl(categoryImage('fashion'), 'Fashion') }" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', 'Fashion')}'">
       </a>
       <a class="promo promo-b" href="${routes.products({ category: 'electronics' })}">
         <div><span class="badge">${t('Tech fest')}</span><h3>${t('Gadgets up to 30% off')}</h3><p>${t('Phones, laptops and accessories')}</p><span class="btn btn-white btn-sm">${t('Shop electronics')}</span></div>
-        <img src="${categoryImage('electronics') || ''}" alt="" loading="lazy">
+        <img src="${safeMediaUrl(categoryImage('electronics'), 'Electronics')}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', 'Electronics')}'">
       </a>
     </section>
 
@@ -228,6 +230,14 @@ async function render() {
       </div>
     </section>
   </div>`;
+
+  main.querySelectorAll('.reel-thumb img').forEach((image, index) => {
+    const reel = ranked[index];
+    const product = db.get('products', Array.isArray(reel?.productIds) ? reel.productIds[0] : null);
+    const poster = safeMediaUrl(product?.thumbnail || reel?.poster, product?.title || reel?.caption || 'Reel preview');
+    if (!image.getAttribute('src')) image.src = poster;
+    image.onerror = () => { image.onerror = null; image.src = safeMediaUrl(product?.thumbnail, product?.title || reel?.caption || 'Reel preview'); };
+  });
 
   startDealTimer(main.querySelector('[data-timer]'));
   bindInstall(main.querySelector('[data-install]'));

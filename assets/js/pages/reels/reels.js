@@ -4,7 +4,7 @@ import { openQuickBuy } from '../../components/quickBuy.js';
 import { toast } from '../../components/toast.js';
 import { emptyState, loading } from '../../components/cards.js';
 import { routes } from '../../core/routes.js';
-import { escapeHtml, icon, qs, $, $$, avatar, formatNumber, formatPrice, timeAgo } from '../../core/utils.js';
+import { escapeHtml, icon, qs, $, $$, avatar, formatNumber, formatPrice, timeAgo, safeMediaUrl } from '../../core/utils.js';
 import { getReels, isLiked, isSaved, toggleLike, toggleSave, recordShare, recordView, getComments, addComment, reelSync } from '../../services/reels.js';
 import { vendorSync, isFollowing, toggleFollow } from '../../services/vendors.js';
 import { rankReels, track } from '../../services/ai.js';
@@ -34,11 +34,13 @@ function reelHtml(r) {
   const v = vendorSync(r.vendorId);
   const following = isFollowing(v.id);
   const videoUrl = r.resolvedVideoUrl || (r.videoUrl.startsWith('local-media:') ? '' : r.videoUrl);
+  const product = db.get('products', Array.isArray(r.productIds) ? r.productIds[0] : null);
+  const poster = safeMediaUrl(product?.thumbnail || r.poster, product?.title || r.caption || 'Reel preview');
   return `
   <section class="reel" data-reel="${r.id}">
     <div class="reel-stage">
       <div class="reel-progress"></div>
-      <video ${videoUrl ? `src="${videoUrl}"` : ''} poster="${r.poster}" loop playsinline muted preload="metadata"></video>
+      <video ${videoUrl ? `src="${videoUrl}"` : ''} poster="${poster}" loop playsinline muted preload="metadata" onerror="this.poster='${poster}'"></video>
       <div class="reel-top">
         <span class="badge" style="background:rgba(0,0,0,.4);color:#fff">${icon('eye')} ${formatNumber(r.views)}</span>
         <button class="glass" data-mute aria-label="Toggle sound">${icon(muted ? 'volume-x' : 'volume-2')}</button>

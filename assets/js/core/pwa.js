@@ -8,10 +8,14 @@ let registrationPromise = null;
 export function registerSW() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
   if (registrationPromise) return registrationPromise;
-  const root = document.body?.dataset?.root || './';
-  const swUrl = root.endsWith('/') ? `${root}sw.js` : `${root}/sw.js`;
-  registrationPromise = navigator.serviceWorker.register(swUrl).catch((err) => {
-    registrationPromise = null;
+
+  registrationPromise = navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }).then(() => {
+    const root = document.body?.dataset?.root || './';
+    const swUrl = root.endsWith('/') ? `${root}sw.js` : `${root}/sw.js`;
+    return navigator.serviceWorker.register(swUrl, { scope: root || './' });
+  }).catch((err) => {
     console.warn('[StreamCart PWA] Service Worker registration failed:', err);
     return null;
   });
