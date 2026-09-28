@@ -331,8 +331,49 @@ export async function register({ name, email, password, phone, role, storeName, 
     options: { data: { name, role, phone, storeName, storeCategory } },
   });
   if (error) throw new Error(error.message || 'Could not create your account.');
-  if (!data.user || !data.session) {
-    throw new Error('Account created. Confirm your email before signing in.');
+  if (!data.user) throw new Error('Could not create your account.');
+
+  if (!data.session) {
+    // Supabase created the account but no session was returned (e.g. email
+    // confirmation is required). Keep direct sign-in working by mirroring the
+    // account locally so the user lands in their dashboard without a forced
+    // email round-trip.
+    const createdAt = data.user.created_at || new Date().toISOString();
+    const localUser = {
+      id: data.user.id,
+      name,
+      email: normalizedEmail,
+      phone,
+      role,
+      status: 'active',
+      joinedAt: createdAt,
+      addresses: [],
+    };
+    if (role === 'vendor') {
+      const vendor = {
+        id: uid('v'),
+        name: storeName,
+        slug: storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        ownerId: localUser.id,
+        ownerName: name,
+        email: normalizedEmail,
+        phone,
+        location: 'Dhaka',
+        color: '#2563eb',
+        description: `${storeName} — ${storeCategory || 'General store'}`,
+        status: 'pending',
+        verified: false,
+        rating: 0,
+        followers: 0,
+        joinedAt: createdAt,
+        commissionRate: 10,
+        balance: 0,
+      };
+      db.insertLocal('vendors', vendor);
+      localUser.vendorId = vendor.id;
+    }
+    db.insertLocal('users', localUser);
+    return startSession(localUser);
   }
 
   const user = await syncAuthUser(supabase, data.user);
