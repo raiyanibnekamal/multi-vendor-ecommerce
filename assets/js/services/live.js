@@ -6,7 +6,7 @@ import { chatPool } from '../data/streams.js';
 import { uid } from '../core/utils.js';
 import { currentUser } from '../core/auth.js';
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 

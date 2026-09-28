@@ -1,6 +1,6 @@
 // Supabase Storage Service
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 const LOCAL_MEDIA_DB = 'streamcart-media';
 const LOCAL_MEDIA_STORE = 'files';

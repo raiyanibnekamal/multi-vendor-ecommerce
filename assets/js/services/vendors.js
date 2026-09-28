@@ -1,7 +1,7 @@
 import { db, respond } from './db.js';
 import { getList, inList, toggleInList, userKey } from './userdata.js';
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 import { store } from '../core/store.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;

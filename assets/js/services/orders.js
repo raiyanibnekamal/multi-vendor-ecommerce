@@ -2,7 +2,7 @@ import { db, respond } from './db.js';
 import { channel } from './realtime.js';
 import { currentUser } from '../core/auth.js';
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 export const PAYMENT_METHODS = [
   { id: 'card', name: 'Credit / Debit Card', note: 'Secure demo payment — no real charge', icon: 'credit-card' },

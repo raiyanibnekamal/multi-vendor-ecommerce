@@ -2,7 +2,7 @@
 // Role checks here are only for UX; real enforcement belongs to RLS policies.
 import { store } from './store.js';
 import { CONFIG } from './config.js';
-import { getSupabase } from './supabase.js';
+import { getSupabase } from './supabase.js?v=20260928-11';
 import { routes, dashboardFor } from './routes.js';
 import { db, respond } from '../services/db.js';
 import { uid } from './utils.js';

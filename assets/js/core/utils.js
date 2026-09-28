@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { t, digits, isBn } from './i18n.js';
+import { buildFallbackSvg } from './fallbackIcons.js';
 
 export { t, digits, isBn };
 
@@ -34,31 +35,52 @@ export function escapeHtml(str = '') {
 
 export function fallbackMediaUrl(label = 'Image', { width = 900, height = 900, bg = '#111827', fg = '#f8fafc' } = {}) {
   const safeLabel = String(label || 'Image').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#1f2937" />
-          <stop offset="100%" stop-color="#0f172a" />
-        </linearGradient>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#g)" rx="32"/>
-      <circle cx="${width * 0.5}" cy="${height * 0.38}" r="${Math.min(width, height) * 0.17}" fill="${bg}" opacity="0.92"/>
-      <path d="M${width * 0.28} ${height * 0.45} L${width * 0.72} ${height * 0.45} L${width * 0.6} ${height * 0.68} L${width * 0.4} ${height * 0.68} Z" fill="${fg}" opacity="0.15"/>
-      <text x="50%" y="57%" text-anchor="middle" fill="${fg}" font-size="${Math.max(34, Math.min(width, height) * 0.06)}" font-family="Segoe UI, Arial, sans-serif" font-weight="700">${safeLabel.slice(0, 18)}</text>
-      <text x="50%" y="67%" text-anchor="middle" fill="${fg}" opacity="0.75" font-size="${Math.max(18, Math.min(width, height) * 0.03)}" font-family="Segoe UI, Arial, sans-serif">No image available</text>
-    </svg>
-  `;
+  const w = Number.isFinite(width) ? width : 900;
+  const h = Number.isFinite(height) ? height : 900;
+  const minSide = Math.min(w, h);
+  const cx = w * 0.5;
+  const cy = h * 0.38;
+  const r = minSide * 0.17;
+  const fSize = Math.max(34, minSide * 0.06);
+  const sSize = Math.max(18, minSide * 0.03);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1">` +
+    `<stop offset="0%" stop-color="#1f2937"/><stop offset="100%" stop-color="#0f172a"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="100%" height="100%" fill="url(#g)" rx="32"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${bg}" opacity="0.92"/>` +
+    `<path d="M${w * 0.28} ${h * 0.45} L${w * 0.72} ${h * 0.45} L${w * 0.6} ${h * 0.68} L${w * 0.4} ${h * 0.68} Z" fill="${fg}" opacity="0.15"/>` +
+    `<text x="50%" y="57%" text-anchor="middle" fill="${fg}" font-size="${fSize}" font-family="Segoe UI, Arial, sans-serif" font-weight="700">${safeLabel.slice(0, 18)}</text>` +
+    `<text x="50%" y="67%" text-anchor="middle" fill="${fg}" opacity="0.75" font-size="${sSize}" font-family="Segoe UI, Arial, sans-serif">No image available</text>` +
+    `</svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+const URL_PATTERN = /^(https?:\/\/|data:(?:image|video|application)\/|blob:|local-media:)/i;
+
+export function isUsableMediaUrl(url) {
+  if (typeof url !== 'string') return false;
+  const candidate = url.trim();
+  if (!candidate) return false;
+  const isRelative = (candidate.startsWith('/') && !candidate.startsWith('//')) || candidate.startsWith('./') || candidate.startsWith('../');
+  return isRelative || URL_PATTERN.test(candidate);
+}
+
 export function safeMediaUrl(url, fallbackLabel = 'Image', fallbackColors) {
-  if (typeof url === 'string') {
-    const candidate = url.trim();
-    const isRelative = (candidate.startsWith('/') && !candidate.startsWith('//')) || candidate.startsWith('./') || candidate.startsWith('../');
-    if (isRelative || /^(https?:\/\/|data:image\/|blob:)/i.test(candidate)) return candidate;
-  }
+  if (isUsableMediaUrl(url)) return String(url).trim();
   return fallbackMediaUrl(fallbackLabel, fallbackColors);
+}
+
+/**
+ * Pick the first usable media URL from a list. Useful when products / reels
+ * carry several candidate sources (thumbnail, poster, first image).
+ */
+export function firstUsableMediaUrl(...candidates) {
+  for (const c of candidates) {
+    if (isUsableMediaUrl(c)) return String(c).trim();
+  }
+  return null;
 }
 
 export function formatPrice(n) {
@@ -135,6 +157,9 @@ export function avatar(name, { size = '', color } = {}) {
   return `<span class="avatar ${size ? 'avatar-' + size : ''}" style="background:${color || colorFor(name)}">${escapeHtml(initials(name))}</span>`;
 }
 
+// A compact inline SVG icon set so the UI still renders when Lucide is blocked.
+// The full icon table now lives in ./fallbackIcons.js so this file stays slim.
+
 export function icon(name, cls = '') {
   return `<i data-lucide="${name}" class="${cls}"></i>`;
 }
@@ -171,14 +196,53 @@ export function on(name, fn) {
   window.addEventListener(name, (e) => fn(e.detail));
 }
 
+function fallbackSvg(name, cls = '') {
+  return buildFallbackSvg(name, cls);
+}
+
 /** Renders Lucide icons for any newly inserted <i data-lucide> elements. */
 export function initIcons() {
   let queued = false;
+  let warnedOffline = false;
   const run = () => {
     queued = false;
-    if (window.lucide && document.querySelector('i[data-lucide]')) window.lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      if (document.querySelector('i[data-lucide]')) window.lucide.createIcons();
+      return;
+    }
+    // Lucide is unavailable (CDN blocked or script failed to load).
+    // Swap every <i data-lucide> for an inline SVG so the UI remains usable.
+    const placeholders = document.querySelectorAll('i[data-lucide]');
+    if (!placeholders.length) return;
+    placeholders.forEach((el) => {
+      const name = el.getAttribute('data-lucide');
+      if (!name) return;
+      const svg = fallbackSvg(name, el.className || '');
+      const tmp = document.createElement('span');
+      tmp.innerHTML = svg.trim();
+      const replacement = tmp.firstElementChild;
+      if (replacement) el.replaceWith(replacement);
+    });
+    if (!warnedOffline) {
+      warnedOffline = true;
+      console.warn('[StreamCart] Lucide icon set unavailable — using inline fallback icons.');
+    }
   };
   const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(run); } };
   new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
   schedule();
+
+  // Even if Lucide loads late, keep watching; the run() function picks it up.
+  let tries = 0;
+  const retry = setInterval(() => {
+    tries++;
+    if (window.lucide) {
+      run();
+      clearInterval(retry);
+    } else if (tries > 40) {
+      // ~6 seconds: settle on the inline fallback so the UI never stays blank.
+      run();
+      clearInterval(retry);
+    }
+  }, 150);
 }

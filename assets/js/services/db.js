@@ -2,7 +2,7 @@
 import { store } from '../core/store.js';
 import { CONFIG } from '../core/config.js';
 import { sleep, uid } from '../core/utils.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 import { categories } from '../data/categories.js';
 import { vendors } from '../data/vendors.js';

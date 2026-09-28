@@ -3,7 +3,7 @@ import { inList, toggleInList, getList } from './userdata.js';
 import { currentUser } from '../core/auth.js';
 import { uid } from '../core/utils.js';
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 import { store } from '../core/store.js';
 import { userKey } from './userdata.js';
 

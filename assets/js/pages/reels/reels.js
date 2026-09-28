@@ -40,7 +40,7 @@ function reelHtml(r) {
   <section class="reel" data-reel="${r.id}">
     <div class="reel-stage">
       <div class="reel-progress"></div>
-      <video ${videoUrl ? `src="${escapeHtml(videoUrl)}"` : ''} poster="${escapeHtml(poster)}" loop playsinline muted preload="metadata" onerror="this.poster='${escapeHtml(poster)}'"></video>
+      <video ${videoUrl ? `src="${escapeHtml(videoUrl)}"` : ''} poster="${escapeHtml(poster)}" loop playsinline muted preload="none" data-loaded="false" onerror="this.poster='${escapeHtml(poster)}'"></video>
       <div class="reel-top">
         <span class="badge" style="background:rgba(0,0,0,.4);color:#fff">${icon('eye')} ${formatNumber(r.views)}</span>
         <button class="glass" data-mute aria-label="Toggle sound">${icon(muted ? 'volume-x' : 'volume-2')}</button>
@@ -199,10 +199,19 @@ function observe(feed) {
   const io = new IntersectionObserver((entries) => {
     entries.forEach((en) => {
       const video = $('video', en.target);
+      if (!video) return;
       if (en.isIntersecting && en.intersectionRatio > 0.6) {
         video.muted = muted;
+        if (video.dataset.loaded !== 'true') {
+          video.preload = 'metadata';
+          video.load();
+          video.dataset.loaded = 'true';
+        }
         video.currentTime = 0;
-        video.play().catch(() => en.target.classList.add('is-paused'));
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => en.target.classList.add('is-paused'));
+        }
         en.target.classList.remove('is-paused');
         const id = en.target.dataset.reel;
         history.replaceState(null, '', routes.reels(id));

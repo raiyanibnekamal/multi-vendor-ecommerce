@@ -2,7 +2,7 @@ import { db, respond } from './db.js';
 import { seeded, uid } from '../core/utils.js';
 import { currentUser } from '../core/auth.js';
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 // ---------- Categories (flat rows with parentId => nested tree) ----------
 export function getCategoriesSync() {

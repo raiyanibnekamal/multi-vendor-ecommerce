@@ -1,5 +1,5 @@
 // StreamCart PWA Service Worker
-const CACHE_NAME = 'streamcart-v10-2026-09-28-security';
+const CACHE_NAME = 'streamcart-v12-2026-09-28-icons';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const PRECACHE_ASSETS = [
   './assets/css/layout.css',
   './assets/css/components.css',
   './assets/css/dashboard.css',
+  './assets/vendor/lucide.min.js',
+  './assets/vendor/chart.umd.min.js',
   './assets/img/icon.svg',
   './assets/img/icon-192.png',
   './assets/img/icon-512.png',

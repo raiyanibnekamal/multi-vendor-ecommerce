@@ -76,7 +76,7 @@ async function render() {
   <div class="watch">
     <div class="watch-left">
       <div class="player">
-        <video src="${s.videoUrl || SAMPLE_VIDEOS[1]}" poster="${s.thumbnail}" ${s.status !== 'scheduled' ? 'autoplay' : ''} muted loop playsinline></video>
+        <video src="${s.videoUrl || SAMPLE_VIDEOS[1]}" poster="${s.thumbnail}" ${s.status !== 'scheduled' ? 'autoplay' : ''} muted loop playsinline preload="none" data-loaded="false" playsinline></video>
         <div class="shade"></div>
         <div class="player-top">
           ${statusBadge}

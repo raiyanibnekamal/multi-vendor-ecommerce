@@ -1,6 +1,6 @@
 // Realtime Service with Supabase Channels and BroadcastChannel fallback
 import { CONFIG } from '../core/config.js';
-import { getSupabase } from '../core/supabase.js';
+import { getSupabase } from '../core/supabase.js?v=20260928-11';
 import { db } from './db.js';
 
 const channels = new Map();
