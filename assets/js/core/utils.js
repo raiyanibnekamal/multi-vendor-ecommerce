@@ -42,16 +42,28 @@ export function formatNumber(n) {
   return digits(n);
 }
 
+function safeDate(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatDate(iso, opts = { day: 'numeric', month: 'short', year: 'numeric' }) {
-  return new Date(iso).toLocaleDateString(DATE_LOCALE, opts);
+  const date = safeDate(iso);
+  if (!date) return '—';
+  return date.toLocaleDateString(DATE_LOCALE, opts);
 }
 
 export function formatDateTime(iso) {
-  return new Date(iso).toLocaleString(DATE_LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const date = safeDate(iso);
+  if (!date) return '—';
+  return date.toLocaleString(DATE_LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 export function timeAgo(iso) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  const date = safeDate(iso);
+  if (!date) return t('recently');
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
   if (s < 0) return t('in {time}', { time: timeUntil(iso) });
   if (s < 60) return t('just now');
   const m = Math.floor(s / 60); if (m < 60) return t('{n}m ago', { n: digits(m) });
@@ -61,7 +73,9 @@ export function timeAgo(iso) {
 }
 
 export function timeUntil(iso) {
-  const s = Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
+  const date = safeDate(iso);
+  if (!date) return '—';
+  const s = Math.max(0, Math.floor((date.getTime() - Date.now()) / 1000));
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   if (d > 0) return t('{d}d {h}h', { d: digits(d), h: digits(h) });
   if (h > 0) return t('{h}h {m}m', { h: digits(h), m: digits(m) });

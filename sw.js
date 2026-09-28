@@ -1,5 +1,5 @@
 // StreamCart PWA Service Worker
-const CACHE_NAME = 'streamcart-v3';
+const CACHE_NAME = 'streamcart-v6-2026-09-28';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

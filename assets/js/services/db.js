@@ -34,6 +34,19 @@ const POSTGRES_TABLES = {
 const cache = {};
 const tableKey = (t) => `db_${t}`;
 
+function hydrateSeedRow(table, row) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+  const seedTable = SEEDS[table] || [];
+  const seed = seedTable.find((candidate) => candidate && candidate.id === row.id);
+  if (!seed) return row;
+  return { ...seed, ...row };
+}
+
+function hydrateSeedRows(table, rows) {
+  if (!Array.isArray(rows)) return Array.isArray(rows) ? rows : [];
+  return rows.map((row) => hydrateSeedRow(table, row));
+}
+
 function snakeToCamel(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
   const out = {};
@@ -81,7 +94,8 @@ function toPostgresRow(table, row) {
 function load(table) {
   if (!cache[table]) {
     const saved = store.get(tableKey(table));
-    cache[table] = saved ?? structuredClone(SEEDS[table] ?? []);
+    const base = saved ?? structuredClone(SEEDS[table] ?? []);
+    cache[table] = hydrateSeedRows(table, base);
   }
   return cache[table];
 }

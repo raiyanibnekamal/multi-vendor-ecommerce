@@ -16,7 +16,7 @@ function render() {
       <form class="card" data-store>
         <div class="card-head"><h3>Store profile</h3>${statusBadge(v.status)}</div>
         <div class="card-body stack">
-          <div class="row" style="gap:16px">${avatar(v.name, { size: 'lg', color: v.color })}<div><b>${escapeHtml(v.name)}</b><div class="xs muted">Joined ${formatDate(v.joinedAt)} · Commission ${v.commissionRate}%</div></div></div>
+          <div class="row" style="gap:16px">${avatar(v.name, { size: 'lg', color: v.color })}<div><b>${escapeHtml(v.name)}</b><div class="xs muted">Joined ${v.joinedAt && !Number.isNaN(new Date(v.joinedAt).getTime()) ? formatDate(v.joinedAt) : 'Recently'} · Commission ${v.commissionRate || 10}%</div></div></div>
           <div class="form-grid">
             <div class="field"><label>Store name</label><input class="input" name="name" value="${escapeHtml(v.name)}" required></div>
             <div class="field"><label>Location</label><input class="input" name="location" value="${escapeHtml(v.location)}"></div>
