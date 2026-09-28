@@ -10,9 +10,10 @@ import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
 
 function vendorNav(vendor) {
-  const pending = vendorOrdersSync(vendor.id).filter((o) => o.status === 'pending').length;
-  const isLive = db.where('streams', (s) => s.vendorId === vendor.id && s.status === 'live').length;
-  const unread = db.where('conversations', (c) => c.vendorId === vendor.id && c.messages.at(-1)?.from === 'customer').length;
+  const vendorId = vendor?.id ?? null;
+  const pending = vendorId ? vendorOrdersSync(vendorId).filter((o) => o.status === 'pending').length : 0;
+  const isLive = vendorId ? db.where('streams', (s) => s.vendorId === vendorId && s.status === 'live').length : 0;
+  const unread = vendorId ? db.where('conversations', (c) => c.vendorId === vendorId && c.messages.at(-1)?.from === 'customer').length : 0;
   return [
     ['dashboard', 'layout-dashboard', 'Overview'],
     'Catalog',

@@ -5,9 +5,14 @@ import { icon, qs, $, escapeHtml } from '../../core/utils.js';
 
 const next = qs('next');
 function go(user) {
-  const otherDashboard = next && ['vendor', 'admin'].some((r) => r !== user.role && next.includes(`/${r}/`));
-  if (next && !otherDashboard) location.href = next;
-  else location.href = user.role === 'customer' ? routes.home() : dashboardFor(user.role);
+  const decodedNext = next ? decodeURIComponent(next) : '';
+  const safeNext = decodedNext && !decodedNext.startsWith('/pages/auth/') ? decodedNext : '';
+  const otherDashboard = safeNext && ['vendor', 'admin'].some((r) => r !== user.role && safeNext.includes(`/${r}/`));
+  if (safeNext && !otherDashboard) {
+    location.href = safeNext;
+    return;
+  }
+  location.href = user.role === 'customer' ? routes.home() : dashboardFor(user.role);
 }
 
 const existing = currentUser();

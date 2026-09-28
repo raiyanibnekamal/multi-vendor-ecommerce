@@ -8,8 +8,21 @@ const DATE_LOCALE = isBn ? 'bn-BD' : 'en-GB';
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-export const ROOT = document.body?.dataset.root ?? './';
-export const url = (path = '') => ROOT + path.replace(/^\//, '');
+export const ROOT = (() => {
+  const bodyRoot = document.body?.dataset?.root;
+  if (bodyRoot) return bodyRoot;
+
+  const pathname = location.pathname.replace(/\/+$/, '');
+  const pageMatch = pathname.match(/^(.*\/)[^/]+\.html?$/i);
+  if (pageMatch) {
+    const base = pageMatch[1] || '/';
+    return base === '/' ? './' : base;
+  }
+
+  return './';
+})();
+
+export const url = (path = '') => ROOT + String(path).replace(/^\//, '');
 
 export function qs(name) {
   return new URLSearchParams(location.search).get(name);

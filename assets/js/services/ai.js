@@ -11,8 +11,24 @@ import { CONFIG } from '../core/config.js';
 const WEIGHTS = { view: 1, reel_watch: 2, like: 3, wishlist: 3, cart: 4, purchase: 6, search: 1 };
 let aiUnavailable = false;
 
+function localStaticAiDisabled() {
+  if (typeof location === 'undefined') return false;
+  if (location.protocol === 'file:') return true;
+
+  const host = (location.hostname || '').toLowerCase();
+  const port = String(location.port || '');
+  const localhostLike = ['localhost', '127.0.0.1', '0.0.0.0'].includes(host) || host.endsWith('.localhost');
+  const staticPreviewPorts = new Set(['4173', '5173', '5500', '8001', '8080']);
+  const apiReadyHosts = /vercel\.app$/i.test(host) || /render\.com$/i.test(host) || /netlify\.app$/i.test(host) || /azurewebsites\.net$/i.test(host);
+
+  if (apiReadyHosts) return false;
+  if (localhostLike && staticPreviewPorts.has(port)) return true;
+  if (localhostLike && !port) return true;
+  return false;
+}
+
 async function callAI(action, input) {
-  if (aiUnavailable || typeof location === 'undefined' || location.protocol === 'file:') return null;
+  if (aiUnavailable || typeof location === 'undefined' || localStaticAiDisabled()) return null;
   const controller = new AbortController();
   const timeoutMs = ['rank-products', 'rank-reels'].includes(action) ? 3_500 : 8_000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -23,7 +39,10 @@ async function callAI(action, input) {
       body: JSON.stringify({ action, input }),
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if ([405, 404, 501].includes(response.status)) aiUnavailable = true;
+      return null;
+    }
     const result = await response.json();
     if (result.available === false) {
       aiUnavailable = true;
@@ -31,6 +50,7 @@ async function callAI(action, input) {
     }
     return result;
   } catch {
+    aiUnavailable = true;
     return null;
   } finally {
     clearTimeout(timeout);

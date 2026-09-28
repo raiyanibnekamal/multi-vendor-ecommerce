@@ -22,7 +22,12 @@ function orderRow(o, isNew = false) {
 }
 
 async function render() {
-  const v = el.vendor;
+  const v = el?.vendor || null;
+  if (!v || !v.id) {
+    el.innerHTML = '<div class="card"><div class="card-body center"><h3>Store access unavailable</h3><p class="muted">Your vendor profile could not be resolved. Please sign in again or reopen the dashboard.</p></div></div>';
+    return;
+  }
+
   el.innerHTML = loading();
   const s = await vendorStats(v.id);
   const recent = vendorOrdersSync(v.id).slice(0, 6);

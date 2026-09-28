@@ -8,22 +8,222 @@ import { db, respond } from '../services/db.js';
 import { uid } from './utils.js';
 
 export function getSession() {
-  return store.get('session');
+  const session = store.get('session');
+  if (!session || typeof session !== 'object') return null;
+
+  const normalized = {
+    userId: session.userId || null,
+    role: session.role || null,
+    vendorId: session.vendorId || null,
+    email: session.email || null,
+    name: session.name || null,
+  };
+
+  if (!normalized.userId && !normalized.email) {
+    store.remove('session');
+    return null;
+  }
+
+  return normalized;
+}
+
+function ensureUserVendorMatch(user) {
+  if (!user) return null;
+
+  const fallbackVendor = db.all('vendors').find((candidate) =>
+    candidate.ownerId === user.id ||
+    candidate.email?.toLowerCase() === String(user.email || '').toLowerCase() ||
+    candidate.ownerName === user.name
+  );
+
+  if (!fallbackVendor) return user;
+  const nextUser = {
+    ...user,
+    vendorId: user.vendorId || fallbackVendor.id,
+    role: user.role || 'vendor',
+  };
+
+  if (user.id) {
+    const existing = db.get('users', user.id);
+    if (existing) {
+      db.updateLocal('users', user.id, { ...existing, ...nextUser, vendorId: nextUser.vendorId });
+    } else {
+      const matchByEmail = db.all('users').find((candidate) => candidate.email?.toLowerCase() === String(user.email || '').toLowerCase());
+      if (matchByEmail) {
+        db.updateLocal('users', matchByEmail.id, { ...matchByEmail, ...nextUser, vendorId: nextUser.vendorId });
+      } else {
+        db.insertLocal('users', nextUser);
+      }
+    }
+  }
+
+  return nextUser;
 }
 
 export function currentUser() {
   const s = getSession();
-  return s ? db.get('users', s.userId) : null;
+  if (!s) return null;
+
+  let user = s.userId ? db.get('users', s.userId) : null;
+  if (!user && s.email) {
+    user = db.all('users').find((candidate) => candidate.email?.toLowerCase() === String(s.email).toLowerCase());
+  }
+
+  if (!user) {
+    user = {
+      id: s.userId || s.email || `session_${Date.now()}`,
+      name: s.name || (s.email ? s.email.split('@')[0] : 'User'),
+      email: s.email || '',
+      role: s.role || 'customer',
+      vendorId: s.vendorId || null,
+      phone: '',
+      status: 'active',
+      addresses: [],
+      joinedAt: new Date().toISOString(),
+    };
+  }
+
+  const hydrated = ensureUserVendorMatch(user);
+  const fixed = {
+    userId: hydrated.id,
+    role: hydrated.role,
+    vendorId: hydrated.vendorId || null,
+    email: hydrated.email,
+    name: hydrated.name,
+  };
+
+  if (s.userId !== fixed.userId || s.role !== fixed.role || s.vendorId !== fixed.vendorId || s.email !== fixed.email || s.name !== fixed.name) {
+    try {
+      store.set('session', fixed);
+    } catch {
+      // Ignore storage write failures; the valid user object should still be used.
+    }
+  }
+
+  return hydrated;
 }
 
 export function currentVendor() {
   const u = currentUser();
-  return u?.vendorId ? db.get('vendors', u.vendorId) : null;
+  if (!u) return null;
+
+  const vendorId = u.vendorId || db.all('vendors').find((candidate) =>
+    candidate.ownerId === u.id ||
+    candidate.email?.toLowerCase() === String(u.email || '').toLowerCase() ||
+    candidate.ownerName === u.name
+  )?.id;
+
+  if (!vendorId) return null;
+
+  const vendor = db.get('vendors', vendorId);
+  if (vendor) {
+    try {
+      const session = store.get('session') || {};
+      if (session.userId === u.id && session.vendorId !== vendor.id) {
+        store.set('session', { ...session, vendorId: vendor.id });
+      }
+      if (u.vendorId !== vendor.id) {
+        db.updateLocal('users', u.id, { ...u, vendorId: vendor.id });
+      }
+    } catch {
+      // Ignore storage errors; the recovered vendor is still valid for rendering.
+    }
+    return vendor;
+  }
+
+  return null;
+}
+
+function pickCanonicalUser(user) {
+  if (!user) return user;
+  const email = String(user.email || '').trim().toLowerCase();
+  const matches = db.all('users').filter((candidate) => {
+    if (!candidate) return false;
+    return candidate.id === user.id || (email && candidate.email && candidate.email.toLowerCase() === email);
+  });
+
+  if (!matches.length) return user;
+  const best = matches.sort((a, b) => Number(Boolean(b.vendorId)) - Number(Boolean(a.vendorId)) || 0)[0];
+  return {
+    ...best,
+    ...user,
+    id: best.id || user.id,
+    email: best.email || user.email || '',
+    name: best.name || user.name || (user.email ? user.email.split('@')[0] : 'User'),
+    role: best.role || user.role || 'customer',
+    vendorId: best.vendorId || user.vendorId || null,
+    phone: best.phone || user.phone || '',
+    status: best.status || user.status || 'active',
+    addresses: best.addresses || user.addresses || [],
+    joinedAt: best.joinedAt || user.joinedAt || new Date().toISOString(),
+  };
 }
 
 function startSession(user) {
-  store.set('session', { userId: user.id, role: user.role, vendorId: user.vendorId || null });
-  return user;
+  const canonical = ensureUserVendorMatch(pickCanonicalUser(user));
+  const normalized = {
+    id: canonical.id,
+    name: canonical.name || canonical.email?.split('@')[0] || 'User',
+    email: canonical.email || '',
+    role: canonical.role || 'customer',
+    vendorId: canonical.vendorId || null,
+    phone: canonical.phone || '',
+    status: canonical.status || 'active',
+    addresses: canonical.addresses || [],
+    joinedAt: canonical.joinedAt || new Date().toISOString(),
+  };
+
+  const existing = db.get('users', normalized.id) || db.all('users').find((candidate) => candidate.email?.toLowerCase() === normalized.email.toLowerCase());
+  if (!existing) {
+    db.insertLocal('users', normalized);
+  } else if (existing.id === normalized.id || existing.email?.toLowerCase() === normalized.email.toLowerCase()) {
+    const merged = {
+      ...existing,
+      ...normalized,
+      id: existing.id || normalized.id,
+      email: existing.email || normalized.email,
+      vendorId: existing.vendorId || normalized.vendorId || null,
+      role: existing.role || normalized.role,
+    };
+    db.updateLocal('users', merged.id, merged);
+  }
+
+  const session = { userId: normalized.id, role: normalized.role, vendorId: normalized.vendorId || null, email: normalized.email, name: normalized.name };
+  store.set('session', session);
+  return normalized;
+}
+
+function fallbackDemoUser(email, role) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const vendor = db.all('vendors').find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
+  const existing = db.all('users').find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
+
+  if (existing) return existing;
+  if (vendor) {
+    return {
+      id: vendor.ownerId || uid('u'),
+      name: vendor.ownerName || vendor.name || 'Vendor Demo',
+      email: vendor.email,
+      password: CONFIG.DEMO_ACCOUNTS[role]?.password || 'demo123',
+      role: 'vendor',
+      vendorId: vendor.id,
+      phone: vendor.phone || '',
+      status: 'active',
+      joinedAt: new Date().toISOString(),
+    };
+  }
+
+  const demo = CONFIG.DEMO_ACCOUNTS[role];
+  if (!demo) return null;
+  return {
+    id: uid('u'),
+    name: role === 'admin' ? 'Platform Admin' : role === 'vendor' ? 'Vendor Demo' : 'Customer Demo',
+    email: normalizedEmail,
+    password: demo.password,
+    role,
+    status: 'active',
+    joinedAt: new Date().toISOString(),
+  };
 }
 
 function isDemoAccount(email) {
@@ -60,20 +260,23 @@ export async function login(email, password) {
   if (isDemoAccount(normalizedEmail) || CONFIG.USE_MOCK) {
     await respond(null, 350);
 
-    const demoUser = localUser || (demoAccount ? {
-      id: uid('u'),
-      name: demoAccount[0] === 'admin' ? 'Platform Admin' : demoAccount[0] === 'vendor' ? 'Vendor Demo' : 'Customer Demo',
-      email: normalizedEmail,
-      password: demoAccount[1].password,
-      role: demoAccount[0],
-      status: 'active',
-      joinedAt: new Date().toISOString(),
-    } : null);
+    const demoUser = localUser || fallbackDemoUser(normalizedEmail, demoAccount?.[0] || 'customer');
 
     if (!demoUser || demoUser.password !== password) throw new Error('Invalid email or password.');
     if (demoUser.status === 'blocked') throw new Error('This account has been suspended. Contact support.');
-    db.insertLocal('users', demoUser);
-    return startSession(demoUser);
+
+    const canonicalUser = pickCanonicalUser(demoUser);
+    const existingUser = db.all('users').find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
+    if (existingUser && existingUser.id !== canonicalUser.id) {
+      db.updateLocal('users', existingUser.id, { ...existingUser, ...canonicalUser, id: existingUser.id, email: existingUser.email || canonicalUser.email, vendorId: existingUser.vendorId || canonicalUser.vendorId || null });
+      return startSession({ ...existingUser, ...canonicalUser, id: existingUser.id, email: existingUser.email || canonicalUser.email, vendorId: existingUser.vendorId || canonicalUser.vendorId || null });
+    }
+    if (existingUser) {
+      db.updateLocal('users', existingUser.id, { ...existingUser, ...canonicalUser, vendorId: existingUser.vendorId || canonicalUser.vendorId || null });
+      return startSession({ ...existingUser, ...canonicalUser, vendorId: existingUser.vendorId || canonicalUser.vendorId || null });
+    }
+    db.insertLocal('users', canonicalUser);
+    return startSession(canonicalUser);
   }
 
   const supabase = await getSupabase();
@@ -168,11 +371,13 @@ export async function logout(redirect = true) {
 export function requireRole(...roles) {
   const user = currentUser();
   if (!user) {
-    location.replace(routes.login(location.pathname + location.search));
+    const next = encodeURIComponent(location.pathname + location.search);
+    location.replace(routes.login(next));
     return null;
   }
   if (roles.length && !roles.includes(user.role)) {
-    location.replace(dashboardFor(user.role));
+    const allowed = dashboardFor(user.role);
+    location.replace(allowed || routes.home());
     return null;
   }
   return user;
