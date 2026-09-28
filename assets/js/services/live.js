@@ -4,6 +4,11 @@ import { db, respond } from './db.js';
 import { channel } from './realtime.js';
 import { chatPool } from '../data/streams.js';
 import { uid } from '../core/utils.js';
+import { currentUser } from '../core/auth.js';
+import { CONFIG } from '../core/config.js';
+import { getSupabase } from '../core/supabase.js';
+
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 const VIEWER_NAMES = ['Rakib', 'Mim', 'Sabbir', 'Nabila', 'Fahim', 'Tania', 'Jubayer', 'Riya', 'Mehedi', 'Sumaiya', 'Arif', 'Tuhin', 'Shila', 'Nayeem', 'Priya'];
 export const REACTIONS = ['❤️', '🔥', '😍', '👏', '😂', '🛒'];
@@ -40,38 +45,79 @@ export function streamChannel(id) {
   return channel(`stream:${id}`);
 }
 
+export function getStreamMessages(streamId) {
+  return db.where('streamChat', (message) => message.streamId === streamId)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+
+export async function toggleStreamLike(streamId) {
+  const user = currentUser();
+  if (!user) throw new Error('Sign in to like this stream.');
+  if (!CONFIG.USE_MOCK && UUID_PATTERN.test(user.id)) {
+    const supabase = await getSupabase();
+    if (!supabase) throw new Error('Live stream service is unavailable. Please try again.');
+    const { data, error } = await supabase.rpc('toggle_stream_like', { p_stream_id: streamId });
+    if (error) throw new Error(error.message || 'Could not update this stream like.');
+    db.updateLocal('streams', streamId, { likes: data.likes });
+    return data;
+  }
+  const stream = db.updateLocal('streams', streamId, (current) => ({ likes: (current.likes || 0) + 1 }));
+  return { active: true, likes: stream?.likes || 0 };
+}
+
 export async function scheduleStream({ vendorId, title, scheduledAt, productIds, categoryId, thumbnail }) {
   const s = {
     id: uid('s'), vendorId, title, status: 'scheduled', categoryId, productIds, pinnedProductId: productIds[0] || null,
     videoUrl: null, thumbnail, viewers: 0, peakViewers: 0, likes: 0, startedAt: null, scheduledAt, status_moderation: 'ok',
   };
-  db.insert('streams', s);
+  await db.insertAndSync('streams', s);
   return respond(s);
 }
 
 export async function startStream(id) {
-  const s = db.update('streams', id, { status: 'live', startedAt: new Date().toISOString(), viewers: 0 });
+  const s = await db.updateAndSync('streams', id, { status: 'live', startedAt: new Date().toISOString(), viewers: 0 });
   streamChannel(id).send('status', 'live', { remote: false });
   return respond(s);
 }
 
 export async function endStream(id) {
-  const s = db.update('streams', id, (st) => ({ status: 'ended', peakViewers: Math.max(st.peakViewers || 0, st.viewers || 0), viewers: 0 }));
+  const current = db.get('streams', id);
+  if (!current) throw new Error('Stream not found.');
+  const s = await db.updateAndSync('streams', id, { status: 'ended', peakViewers: Math.max(current.peakViewers || 0, current.viewers || 0), viewers: 0 });
   streamChannel(id).send('status', 'ended', { remote: false });
   return respond(s);
 }
 
 export async function updateStream(id, patch) {
-  return respond(db.update('streams', id, patch));
+  return respond(await db.updateAndSync('streams', id, patch));
 }
 
-export function pinProduct(streamId, productId) {
-  db.update('streams', streamId, { pinnedProductId: productId });
+export async function pinProduct(streamId, productId) {
+  await db.updateAndSync('streams', streamId, { pinnedProductId: productId });
   streamChannel(streamId).send('pin', productId, { remote: false });
 }
 
-export function sendChat(streamId, msg) {
-  const m = { id: uid('cm'), createdAt: new Date().toISOString(), ...msg };
+export async function sendChat(streamId, msg) {
+  const user = currentUser();
+  let m;
+  if (msg.role !== 'system' && !msg.simulated && user && !CONFIG.USE_MOCK && UUID_PATTERN.test(user.id)) {
+    const supabase = await getSupabase();
+    if (!supabase) throw new Error('Live chat service is unavailable. Please try again.');
+    const { data, error } = await supabase.rpc('send_stream_message', { p_stream_id: streamId, p_text: msg.text });
+    if (error) throw new Error(error.message || 'Could not send your stream message.');
+    m = {
+      ...data,
+      streamId: data.stream_id,
+      userId: data.user_id,
+      userName: data.user_name,
+      text: data.message,
+      role: data.is_vendor ? 'host' : 'viewer',
+      createdAt: data.created_at,
+    };
+    db.insertLocal('streamChat', m);
+  } else {
+    m = { id: uid('cm'), streamId, createdAt: new Date().toISOString(), ...msg };
+  }
   streamChannel(streamId).send('chat', m);
   return m;
 }

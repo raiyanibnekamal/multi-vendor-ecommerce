@@ -7,8 +7,8 @@ import { db } from '../../services/db.js';
 
 const el = mountAccount('addresses', 'Addresses');
 
-function saveAll(list) {
-  db.update('users', el.user.id, { addresses: list });
+async function saveAll(list) {
+  await db.updateAndSync('users', el.user.id, { addresses: list });
 }
 
 function editAddress(addr) {
@@ -24,17 +24,19 @@ function editAddress(addr) {
     </form>`,
     footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-save>Save address</button>',
   });
-  m.el.querySelector('[data-save]').onclick = () => {
+  m.el.querySelector('[data-save]').onclick = async () => {
     const f = m.el.querySelector('[data-f]');
     if (!f.reportValidity()) return;
     const row = { label: f.label.value, name: f.name.value.trim(), phone: f.phone.value.trim(), area: f.area.value.trim(), line: f.line.value.trim() };
     const list = [...(el.user.addresses || [])];
     if (addr) Object.assign(list.find((x) => x.id === addr.id), row);
     else list.push({ id: uid('a'), ...row, isDefault: !list.length });
-    saveAll(list);
-    m.close();
-    toast('Address saved');
-    render();
+    try {
+      await saveAll(list);
+      m.close();
+      toast('Address saved');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   };
 }
 
@@ -54,11 +56,14 @@ function render() {
       </div>`).join('')}</div>` : emptyState('map-pin', 'No saved addresses', 'Add one to check out faster.')}`;
   el.querySelector('[data-add]').onclick = () => editAddress();
   $$('[data-edit]', el).forEach((b) => (b.onclick = () => editAddress(list.find((a) => a.id === b.dataset.edit))));
-  $$('[data-default]', el).forEach((b) => (b.onclick = () => { saveAll(list.map((a) => ({ ...a, isDefault: a.id === b.dataset.default }))); render(); }));
+  $$('[data-default]', el).forEach((b) => (b.onclick = async () => {
+    try { await saveAll(list.map((a) => ({ ...a, isDefault: a.id === b.dataset.default }))); render(); }
+    catch (error) { toast(error.message, 'error'); }
+  }));
   $$('[data-del]', el).forEach((b) => (b.onclick = async () => {
     if (!(await confirmDialog({ title: 'Delete address?', confirmText: 'Delete', danger: true }))) return;
-    saveAll(list.filter((a) => a.id !== b.dataset.del));
-    render();
+    try { await saveAll(list.filter((a) => a.id !== b.dataset.del)); render(); }
+    catch (error) { toast(error.message, 'error'); }
   }));
 }
 

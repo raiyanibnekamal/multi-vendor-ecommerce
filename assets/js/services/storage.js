@@ -58,7 +58,9 @@ export async function uploadFile(bucket, file, customName) {
   if (!file) return null;
 
   const safeName = file.name?.replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
-  const fileName = customName || `${Date.now()}_${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}_${safeName}`;
+  const fileName = customName
+    ? customName.split('/').map((part) => part.replace(/[^a-zA-Z0-9._-]/g, '_')).filter((part) => part && part !== '.' && part !== '..').join('/')
+    : `${Date.now()}_${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}_${safeName}`;
 
   if (!CONFIG.USE_MOCK) {
     try {

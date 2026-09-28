@@ -5,19 +5,20 @@ import { emptyState } from '../../components/cards.js';
 import { routes } from '../../core/routes.js';
 import { escapeHtml, icon, avatar, formatPrice, formatDate, statusBadge, $, $$ } from '../../core/utils.js';
 import { db } from '../../services/db.js';
+import { updatePayoutStatus } from '../../services/vendors.js';
 
 const el = mountDashboard({ role: 'admin', active: 'payouts', title: 'Payouts' });
 let tab = 'requested';
-const TABS = ['requested', 'processing', 'paid', 'all'];
+const TABS = ['pending', 'processing', 'paid', 'all'];
 
 function render() {
-  const all = db.all('payouts').sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
+  const all = db.all('payouts').map((p) => p.status === 'requested' ? { ...p, status: 'pending' } : p).sort((a, b) => String(b.requestedAt || '').localeCompare(String(a.requestedAt || '')));
   const list = tab === 'all' ? all : all.filter((p) => p.status === tab);
   const sum = (s) => all.filter((p) => p.status === s).reduce((n, p) => n + p.amount, 0);
   const owed = db.all('vendors').reduce((n, v) => n + (v.balance || 0), 0);
   el.innerHTML = `
     <div class="dash-head"><div><h2>Vendor payouts</h2><p>Review withdrawal requests and settle vendor balances (net of commission).</p></div>
-      ${tab === 'requested' && list.length ? `<button class="btn btn-primary" data-approve-all>${icon('check-check')} Approve all (${list.length})</button>` : ''}</div>
+      ${tab === 'pending' && list.length ? `<button class="btn btn-primary" data-approve-all>${icon('check-check')} Approve all (${list.length})</button>` : ''}</div>
     <div class="stats">
       <div class="stat"><span class="ic amber">${icon('hourglass')}</span><div><div class="lbl">Requested</div><div class="val">${formatPrice(sum('requested'))}</div></div></div>
       <div class="stat"><span class="ic">${icon('loader')}</span><div><div class="lbl">Processing</div><div class="val">${formatPrice(sum('processing'))}</div></div></div>
@@ -38,7 +39,7 @@ function render() {
             <td class="small">${formatDate(p.requestedAt)}</td>
             <td>${statusBadge(p.status)}</td>
             <td><div class="actions">
-              ${p.status === 'requested' ? `<button class="btn btn-primary btn-xs" data-set="processing" data-id="${p.id}">Approve</button><button class="btn btn-ghost btn-xs text-danger" data-set="rejected" data-id="${p.id}">Reject</button>` : ''}
+              ${p.status === 'pending' ? `<button class="btn btn-primary btn-xs" data-set="processing" data-id="${p.id}">Approve</button><button class="btn btn-ghost btn-xs text-danger" data-set="rejected" data-id="${p.id}">Reject</button>` : ''}
               ${p.status === 'processing' ? `<button class="btn btn-success btn-xs" data-set="paid" data-id="${p.id}">Mark paid</button>` : ''}
             </div></td>
           </tr>`;
@@ -49,19 +50,24 @@ function render() {
   $$('[data-set]').forEach((b) => (b.onclick = async () => {
     const p = db.get('payouts', b.dataset.id);
     const to = b.dataset.set;
-    if (to === 'rejected') {
-      if (!(await confirmDialog({ title: 'Reject payout?', message: 'The amount will be returned to the vendor balance.', confirmText: 'Reject', danger: true }))) return;
-      db.update('vendors', p.vendorId, (v) => ({ balance: (v.balance || 0) + p.amount }));
+    if (to === 'rejected' && !(await confirmDialog({ title: 'Reject payout?', message: 'The amount will be returned to the vendor balance.', confirmText: 'Reject', danger: true }))) return;
+    try {
+      await updatePayoutStatus(p.id, to);
+      toast(to === 'processing' ? 'Payout approved — transfer initiated' : to === 'paid' ? 'Marked as paid' : 'Payout rejected', to === 'rejected' ? 'info' : 'success');
+      render();
+    } catch (error) {
+      toast(error.message, 'error');
     }
-    db.update('payouts', p.id, { status: to, ...(to === 'paid' ? { paidAt: new Date().toISOString() } : {}) });
-    toast(to === 'processing' ? 'Payout approved — transfer initiated' : to === 'paid' ? 'Marked as paid' : 'Payout rejected', to === 'rejected' ? 'info' : 'success');
-    render();
   }));
   const all$ = $('[data-approve-all]');
-  if (all$) all$.onclick = () => {
-    list.forEach((p) => db.update('payouts', p.id, { status: 'processing' }));
-    toast(`${list.length} payouts approved`);
-    render();
+  if (all$) all$.onclick = async () => {
+    try {
+      for (const payout of list) await updatePayoutStatus(payout.id, 'processing');
+      toast(`${list.length} payouts approved`);
+      render();
+    } catch (error) {
+      toast(error.message, 'error');
+    }
   };
 }
 

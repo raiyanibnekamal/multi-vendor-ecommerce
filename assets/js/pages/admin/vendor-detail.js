@@ -68,14 +68,18 @@ async function render() {
   $$('[data-status]').forEach((b) => (b.onclick = async () => {
     const to = b.dataset.status;
     if (to !== 'approved' && !(await confirmDialog({ title: `Mark ${v.name} as ${to}?`, message: 'This changes what customers can see.', confirmText: 'Confirm', danger: true }))) return;
-    await updateVendor(v.id, { status: to, verified: to === 'approved' ? true : v.verified });
-    toast(`Vendor ${to}`);
-    render();
+    try {
+      await updateVendor(v.id, { status: to, verified: to === 'approved' ? true : v.verified });
+      toast(`Vendor ${to}`);
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
   $('[data-comm]').onsubmit = async (e) => {
     e.preventDefault();
-    await updateVendor(v.id, { commissionRate: +e.target.rate.value, verified: e.target.verified.checked });
-    toast('Vendor updated');
+    try {
+      await updateVendor(v.id, { commissionRate: +e.target.rate.value, verified: e.target.verified.checked });
+      toast('Vendor updated');
+    } catch (error) { toast(error.message, 'error'); }
   };
 }
 

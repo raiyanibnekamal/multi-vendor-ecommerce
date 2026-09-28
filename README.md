@@ -14,11 +14,12 @@ Explore the [architecture](docs/ARCHITECTURE.md), [project audit and roadmap](do
 
 ## 🚀 Latest Updates
 
-- **PWA:** Install prompt handling, network-first page navigation, and offline asset caching.
-- **Supabase:** Auth bridge, Storage uploads, Realtime subscriptions, and authenticated order writes.
-- **AI:** Optional Groq-backed search ranking, recommendations, chat, tagging, descriptions, and moderation review through a server-side Vercel function.
-- **Multilingual UI:** English/Bangla toggle, including core shopping and checkout pages.
-- **Themes:** Dark and light modes with `localStorage` persistence.
+- **Current status (Sept 2026):** polished storefront home, reels, live shopping, account flows, admin and vendor dashboards, and seeded demo commerce flows are in the repo and working as a frontend prototype.
+- **Supabase:** Auth bridge, Storage uploads, Realtime subscriptions, and secured order/write flows are implemented in source; the matching remote database migrations still need to be applied to a live project.
+- **AI:** Optional Groq-backed ranking, recommendations, chat, tagging, descriptions, and moderation review through the server-side Vercel `/api/ai` proxy, with local heuristics as fallback.
+- **Multilingual UI:** English/Bangla toggle across core shopping, catalog, cart, checkout, and live-buy flows.
+- **Themes & PWA:** Light/dark modes, persistent theme state, install prompt support, offline caching, and service-worker-safe asset handling.
+- **What remains production-bound:** real payment provider integration, actual payout execution, live video provider token flow, and verified remote Supabase migration deployment.
 
 ## Run locally
 
@@ -31,7 +32,7 @@ An internet connection is needed for fonts, icons (Lucide), charts (Chart.js), p
 
 ### Current backend status
 
-The Supabase project is configured in `assets/js/core/config.js`. Live auth and catalog/reel/stream reads use Supabase; demo accounts and offline state use browser storage. Before relying on order reads/writes in an existing Supabase project, apply [`supabase/migrations/07_rls_recursion_fix.sql`](supabase/migrations/07_rls_recursion_fix.sql). Until applied, that project may return PostgreSQL `42P17` recursion errors for orders and order items. Checkout writes an authenticated order and its items, but no payment provider or webhook is integrated; the current UI marks non-COD orders paid without a provider confirmation. Do not treat online payment as production-ready. Payout execution and live-video transport also need trusted provider/server-side workflows.
+The Supabase project is configured in `assets/js/core/config.js`. Live auth, catalog reads, reel/stream reads, and order-related writes use Supabase when configured; demo accounts and offline state still use browser storage for local testing. Apply migrations 01–08 in order before using live registration, checkout, order status, follows, uploads, disputes, or payouts. Migration 07 fixes order-policy recursion; migration 08 protects profile/vendor fields and moves commerce writes behind checked RPCs. Checkout is COD-only until a payment provider and verified webhook are integrated. Refund issuance, payout transfer, and live-video transport still need external provider workflows.
 
 ## Groq AI setup
 

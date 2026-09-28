@@ -39,9 +39,11 @@ async function render() {
     </div>`;
   $$('[data-del]').forEach((b) => (b.onclick = async () => {
     if (!(await confirmDialog({ title: 'Delete reel?', confirmText: 'Delete', danger: true }))) return;
-    await deleteReel(b.dataset.del);
-    toast('Reel deleted', 'info');
-    render();
+    try {
+      await deleteReel(b.dataset.del);
+      toast('Reel deleted', 'info');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 

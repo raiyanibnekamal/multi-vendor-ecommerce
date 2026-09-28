@@ -82,8 +82,14 @@ function render() {
     toast('AI review complete. Please make the final moderation decision.', 'success');
     render();
   }));
-  $$('[data-del]').forEach((b) => (b.onclick = async () => { await deleteReel(b.dataset.del); toast('Reel removed', 'info'); render(); }));
-  $$('[data-cdel]').forEach((b) => (b.onclick = () => { db.remove('reelComments', b.dataset.cdel); toast('Comment deleted', 'info'); render(); }));
+  $$('[data-del]').forEach((b) => (b.onclick = async () => {
+    try { await deleteReel(b.dataset.del); toast('Reel removed', 'info'); render(); }
+    catch (error) { toast(error.message, 'error'); }
+  }));
+  $$('[data-cdel]').forEach((b) => (b.onclick = async () => {
+    try { await db.removeAndSync('reelComments', b.dataset.cdel); toast('Comment deleted', 'info'); render(); }
+    catch (error) { toast(error.message, 'error'); }
+  }));
   $$('[data-preview]').forEach((b) => (b.onclick = async () => {
     const r = db.get('reels', b.dataset.preview);
     const videoUrl = await resolveMediaUrl(r.videoUrl);

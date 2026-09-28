@@ -76,9 +76,11 @@ async function render() {
   $('[data-schedule]').onclick = scheduleModal;
   $$('[data-cancel]').forEach((b) => (b.onclick = async () => {
     if (!(await confirmDialog({ title: 'Cancel this stream?', confirmText: 'Cancel stream', danger: true }))) return;
-    db.remove('streams', b.dataset.cancel);
-    toast('Stream cancelled', 'info');
-    render();
+    try {
+      await db.removeAndSync('streams', b.dataset.cancel);
+      toast('Stream cancelled', 'info');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 

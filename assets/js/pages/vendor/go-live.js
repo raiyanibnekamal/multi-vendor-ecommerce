@@ -7,6 +7,7 @@ import { streamSync, scheduleStream, startStream, endStream, pinProduct, sendCha
 import { SAMPLE_VIDEOS } from '../../services/reels.js';
 import { channel } from '../../services/realtime.js';
 import { db } from '../../services/db.js';
+import { CONFIG } from '../../core/config.js';
 
 const el = mountDashboard({ role: 'vendor', active: 'go-live', title: 'Go live studio' });
 let stream = null;
@@ -81,7 +82,10 @@ function renderSetup() {
     const ids = [...f.querySelectorAll('[name=p]:checked')].map((c) => c.value);
     if (!ids.length) return toast('Select at least one product to feature', 'error');
     let s = pre;
-    if (s) db.update('streams', s.id, { title: f.title.value.trim(), productIds: ids, pinnedProductId: ids[0] });
+    if (s) {
+      try { await db.updateAndSync('streams', s.id, { title: f.title.value.trim(), productIds: ids, pinnedProductId: ids[0] }); }
+      catch (error) { return toast(error.message, 'error'); }
+    }
     else {
       const first = db.get('products', ids[0]);
       s = await scheduleStream({ vendorId: el.vendor.id, title: f.title.value.trim(), scheduledAt: new Date().toISOString(), productIds: ids, categoryId: first.categoryId, thumbnail: first.images[0] || first.thumbnail });
@@ -182,21 +186,29 @@ function renderStudio() {
   stopSim = simulateAudience(s.id, {
     onChat: addChat,
     onReaction: () => { stats.likes++; $('[data-likes]').textContent = formatNumber(stats.likes); },
-    onViewers: (n) => { stats.peak = Math.max(stats.peak, n); $('[data-viewers]').textContent = formatNumber(n); db.update('streams', s.id, { viewers: n }); },
+    onViewers: (n) => {
+      stats.peak = Math.max(stats.peak, n);
+      $('[data-viewers]').textContent = formatNumber(n);
+      if (CONFIG.USE_MOCK) db.updateLocal('streams', s.id, { viewers: n });
+    },
   });
 
-  const reply = (text) => {
-    const m = sendChat(s.id, { userId: el.user.id, userName: el.vendor.name, text, role: 'host', fromStudio: true });
-    addChat(m);
+  const reply = async (text) => {
+    try {
+      const message = await sendChat(s.id, { userId: el.user.id, userName: el.vendor.name, text, role: 'host', fromStudio: true });
+      addChat(message);
+    } catch (error) { toast(error.message, 'error'); }
   };
-  $('[data-chat-form]').onsubmit = (e) => { e.preventDefault(); const t = e.target.text.value.trim(); if (t) reply(t); e.target.text.value = ''; };
-  $$('[data-quick]').forEach((b) => (b.onclick = () => reply(b.dataset.quick)));
-  $('[data-products]').onclick = (e) => {
+  $('[data-chat-form]').onsubmit = async (e) => { e.preventDefault(); const t = e.target.text.value.trim(); if (t) await reply(t); e.target.text.value = ''; };
+  $$('[data-quick]').forEach((b) => (b.onclick = async () => reply(b.dataset.quick)));
+  $('[data-products]').onclick = async (e) => {
     const b = e.target.closest('[data-pin]');
     if (!b) return;
-    pinProduct(s.id, b.dataset.pin);
-    $('[data-products]').innerHTML = productList();
-    addChat({ role: 'system', text: `📌 Pinned ${db.get('products', b.dataset.pin).title} for viewers` });
+    try {
+      await pinProduct(s.id, b.dataset.pin);
+      $('[data-products]').innerHTML = productList();
+      addChat({ role: 'system', text: `📌 Pinned ${db.get('products', b.dataset.pin).title} for viewers` });
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-mic]').onclick = (e) => {
     const track = media?.getAudioTracks()[0];
@@ -210,8 +222,8 @@ function renderStudio() {
     stopSim?.();
     clearInterval(timer);
     stopCamera();
-    db.update('streams', s.id, { peakViewers: stats.peak, likes: (s.likes || 0) + stats.likes });
     await endStream(s.id);
+    if (CONFIG.USE_MOCK) db.updateLocal('streams', s.id, { peakViewers: stats.peak, likes: (s.likes || 0) + stats.likes });
     const m = openModal({
       title: 'Stream summary',
       content: `<div class="stats">

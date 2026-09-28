@@ -9,6 +9,8 @@
 
 ## 📊 1. Codebase Overview & Current Status
 
+> **Status snapshot (2026-09-28):** The application is in a stable frontend prototype phase with a fully featured storefront, login flows, vendor/admin dashboards, reels discovery, live shopping, AI-assisted discovery, and a working local/demo data model. The remaining work is primarily production hardening: provider-backed payments, payout transfer execution, and verifying the remote Supabase migration state on the hosted project.
+
 - **Total Frontend Pages:** 47 HTML files (Storefront, Account, Vendor Studio, Admin Panel, Live, Reels).
 - **JavaScript Inventory:** 93 source JS files: 91 browser modules under `assets/js`, `api/ai.js`, and `sw.js` — **0 syntax errors** in the source-only parser check.
 - **Import and HTML Reference Integrity:** 0 missing relative imports across 91 browser modules and 0 broken local HTML references across 47 project pages.
@@ -35,8 +37,8 @@
 ---
 
 ### Priority 3: Supabase RLS & Orders Table Data Type Mismatch
-- **Status: Source fix complete; applied migration status unverified.** Live accounts use the Supabase Auth UUID, and awaited order/item writes require it to match the current Auth user before checkout resolves. Seeded demo accounts remain local. An earlier read-only request reproduced `42P17` recursion on both orders and order_items, including a plain orders-only query. Migration `07_rls_recursion_fix.sql` makes role/vendor/order security-definer helpers use a fixed search path, disables RLS internally, and runs as `postgres`; it also recreates the orders/order_items policies. The checkout flow requires sign-in, so anonymous `WITH CHECK (true)` policies are not added. Client-supplied signup metadata cannot assign the admin role.
-- **Existing deployments:** Run `supabase/migrations/07_rls_recursion_fix.sql` after the earlier migrations. It replaces any overlapping order policies and supersedes the order helper portion of migration 06. The live project was not mutated from this workspace.
+- **Status: Source fixes and migration 08 complete; deployed database state unverified.** Live accounts use the Supabase Auth UUID. Migration 07 resolves order-policy recursion; migration 08 removes direct customer order inserts, protects profile roles/vendor financial fields, and moves checkout, vendor fulfillment/cancellation, and payout mutations behind authenticated RPCs. Signup role comes from the database profile, not client metadata.
+- **Existing deployments:** Run migrations through `supabase/migrations/08_backend_security_and_atomic_flows.sql`. The live project was not mutated from this workspace.
 
 ---
 
@@ -46,7 +48,7 @@
 ---
 
 ### Priority 5: Supabase Auth Bridge
-- **Status: Complete.** Non-demo sign-in/sign-up uses Supabase Auth, profiles are mapped into the app session, logout signs out remotely, and profile updates persist to `public.profiles`. Seeded demo accounts remain local. Live account passwords are not stored in the local app database. New account roles are restricted by the database trigger to customer/vendor.
+- **Status: Source fixes implemented; remote migration status unverified.** Non-demo sign-in/sign-up uses Supabase Auth, profile/order/vendor data refreshes after login, logout signs out remotely, and profile updates persist to `public.profiles`. Password changes reauthenticate and call Supabase Auth instead of trying to write a password column. Migration 08 creates pending vendor stores in the auth trigger, including when email confirmation delays the first session. Seeded demo accounts remain local; new account roles are limited to customer/vendor.
 
 ---
 
@@ -57,10 +59,10 @@
 - **Status: Implemented in source; deployment key status not verifiable from this workspace.** AI actions use the Vercel `/api/ai` serverless proxy. The Groq key is read only from server environment variables. The proxy validates allowlisted actions and outputs, limits request size, applies in-memory rate limiting, and local heuristics remain as fallback. Any key pasted into chat must be revoked and rotated before configuration.
 
 ### Priority 8: Payment and Atomic Checkout
-- **Status: Not production-ready.** The frontend writes the order header and items as separate Supabase requests and adjusts stock separately; it does not call the `place_order_atomic` RPC defined in `05_rpc.sql`. The current order flow marks every non-COD method paid without a payment-provider confirmation. Add a trusted checkout/payment-webhook flow and connect the atomic stock/order operation before accepting real payments.
+- **Status: Atomic COD checkout implemented; online payments remain disabled.** Live orders call `place_order_atomic` from migration 08, which derives item pricing and updates stock/order rows transactionally. The UI and service reject card/bKash/Nagad until a provider and verified payment webhook exist. COD becomes paid on delivery; approved refunds and payout requests still require the actual external money transfer to be processed.
 
 ### Priority 9: Vendor Sensitive-Field Authorization
-- **Status: Needs hardening.** The vendor UPDATE policy in `02_rls.sql` checks that the user owns the vendor row, but does not limit changes to specific columns. Enforce sensitive-field protection for commission/status/verification in the database before production use.
+- **Status: Source migration implemented; remote application pending verification.** Migration 08 protects vendor ownership, approval, verification, rating, followers, commission, and balance fields; it also prevents self-service profile role/status escalation, restricts public profile reads, scopes Storage uploads to vendor folders, and moves follow counters behind a server RPC.
 
 ---
 
@@ -76,9 +78,9 @@
   - [x] Use `product-images` for product photos and `reels` for uploaded video files.
 
 - [x] **Task 3: Supabase RLS & Order Insertion Fixes**
-  - [x] Restrict order and item INSERT policies to the authenticated customer who owns the order.
-  - [x] Verify the customer UUID against the active Supabase Auth session before remote insertion.
+  - [x] Remove direct client order/item INSERT access and verify the authenticated customer before invoking the order RPC.
   - [x] Add forward migrations `06_auth_order_hardening.sql` and `07_rls_recursion_fix.sql`, including vendor-owner backfill and recursion-safe policies.
+  - [x] Add migration 08 for role/vendor field protections, atomic checkout, order transitions, and payout RPCs.
 
 - [x] **Task 4: Supabase Realtime Postgres Changes Subscription**
   - [x] Subscribe to order/product tables and per-stream `live_streams` rows; sync the local cache before dispatch.
@@ -93,9 +95,14 @@
   - [x] Add Vercel API actions for product/reel ranking, support chat, auto-tagging, product tags/descriptions, and moderation assistance.
   - [x] Keep credentials server-side and preserve local AI fallbacks.
 
+- [x] **Task 8: Backend Write Hardening**
+  - [x] Add migration 08 for server-derived atomic COD checkout and inventory updates.
+  - [x] Add protected vendor fulfillment, customer/admin cancellation, payout, follow, and dispute RPCs.
+  - [x] Restrict authenticated profile/vendor fields and media uploads by owner.
+
 ## Verification & Operational Notes
 
 - Verified on 2026-09-28: 93 source JavaScript files parse successfully; all 91 browser modules have resolvable relative imports; all 47 project HTML pages have no missing local `src`/`href` targets; `git diff --check` passes. The deployed homepage URL opened, but customer/vendor/admin workflows were not exhaustively browser-tested. No package manifest or automated test suite is present in the repository.
-- The remote Supabase project was not mutated as part of this workspace check, and its applied migration state was not independently verified. Apply migrations through `07_rls_recursion_fix.sql` to existing projects and confirm Storage buckets/policies before testing live orders/uploads.
-- Runtime behaviors represented in source include guarded network-first service-worker caching, local media fallbacks, Supabase Auth for non-demo accounts, and realtime subscriptions with same-browser fallbacks. Live API environment variables and database policies need deployment-side verification; no production credentials or database state were inspected.
+- The remote Supabase project was not mutated as part of this workspace check, and its applied migration state was not independently verified. The migration 08 script executed in an isolated PGlite PostgreSQL instance. Smoke tests passed for role/vendor protection, server-derived pricing, COD-only enforcement, atomic inventory/order changes, delivery credit, payout reserve/refund, customer/admin cancellation restock, confirmation-safe vendor onboarding, follow counters, vendor-scoped uploads, and dispute resolution without marking a refund paid.
+- Runtime behaviors represented in source include guarded network-first service-worker caching, local media fallbacks, Supabase Auth for non-demo accounts, and realtime subscriptions with same-browser fallbacks. Apply migration 08 to the remote Supabase project before using the updated live checkout, order status, dispute, follow, storage-upload, or payout code; no production credentials or database state were inspected.
 - Guest checkout is not implemented; order creation is intentionally authenticated to match the current checkout UI and avoid public unrestricted writes.

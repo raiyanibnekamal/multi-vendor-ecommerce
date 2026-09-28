@@ -59,9 +59,11 @@ async function act(id, action) {
   const v = db.get('vendors', id);
   const map = { approve: 'approved', reject: 'rejected', suspend: 'suspended' };
   if (action !== 'approve' && !(await confirmDialog({ title: `${action[0].toUpperCase() + action.slice(1)} ${v.name}?`, message: action === 'suspend' ? 'Their products, reels and streams will be hidden from the marketplace.' : 'The applicant will be notified by email.', confirmText: action, danger: true }))) return;
-  await updateVendor(id, { status: map[action], verified: action === 'approve' ? true : v.verified });
-  toast(`${v.name} ${map[action]}`, action === 'approve' ? 'success' : 'info');
-  render();
+  try {
+    await updateVendor(id, { status: map[action], verified: action === 'approve' ? true : v.verified });
+    toast(`${v.name} ${map[action]}`, action === 'approve' ? 'success' : 'info');
+    render();
+  } catch (error) { toast(error.message, 'error'); }
 }
 
 if (el) render();

@@ -2,7 +2,7 @@ import { mountDashboard } from '../../components/dashboardLayout.js';
 import { openModal } from '../../components/modal.js';
 import { toast } from '../../components/toast.js';
 import { escapeHtml, icon, avatar, formatPrice, formatDate, statusBadge, $ } from '../../core/utils.js';
-import { updateVendor } from '../../services/vendors.js';
+import { updateVendor, requestVendorPayout } from '../../services/vendors.js';
 import { db } from '../../services/db.js';
 
 const el = mountDashboard({ role: 'vendor', active: 'settings', title: 'Store settings' });
@@ -50,25 +50,36 @@ function render() {
   $('[data-store]').onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target;
-    await updateVendor(v.id, { name: f.name.value.trim(), location: f.location.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim(), description: f.description.value.trim(), color: f.color.value });
-    toast('Store updated');
-    render();
+    try {
+      await updateVendor(v.id, { name: f.name.value.trim(), location: f.location.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim(), description: f.description.value.trim(), color: f.color.value });
+      toast('Store updated');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-payout]').onclick = () => {
     const m = openModal({
       title: 'Request payout',
       content: `<div class="stack"><div class="field"><label>Amount (max ${formatPrice(v.balance)})</label><input class="input" type="number" data-amt value="${v.balance}" max="${v.balance}" min="1000"></div>
-        <div class="field"><label>Method</label><select class="select" data-method><option value="bank">Bank transfer</option><option value="bkash">bKash</option></select></div></div>`,
+        <div class="field"><label>Method</label><select class="select" data-method><option value="bank">Bank transfer</option><option value="bkash">bKash</option></select></div>
+        <div class="field"><label>Account or wallet number</label><input class="input" data-account autocomplete="off" required></div></div>`,
       footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-ok>Submit</button>',
     });
-    m.el.querySelector('[data-ok]').onclick = () => {
-      const amount = Math.min(v.balance, +m.el.querySelector('[data-amt]').value);
+    m.el.querySelector('[data-ok]').onclick = async () => {
+      const amount = Number(m.el.querySelector('[data-amt]').value);
+      const account = m.el.querySelector('[data-account]').value.trim();
       if (amount < 1000) return toast('Minimum payout is ৳1,000', 'error');
-      db.insert('payouts', { id: `PO-${Math.floor(1000 + Math.random() * 9000)}`, vendorId: v.id, amount, method: m.el.querySelector('[data-method]').value, status: 'requested', requestedAt: new Date().toISOString() });
-      db.update('vendors', v.id, { balance: v.balance - amount });
-      m.close();
-      toast('Payout requested');
-      render();
+      if (amount > v.balance || !account) return toast('Enter an amount within your balance and an account number.', 'error');
+      const button = m.el.querySelector('[data-ok]');
+      button.disabled = true;
+      try {
+        await requestVendorPayout({ vendorId: v.id, amount, method: m.el.querySelector('[data-method]').value, account });
+        m.close();
+        toast('Payout requested');
+        render();
+      } catch (error) {
+        button.disabled = false;
+        toast(error.message, 'error');
+      }
     };
   };
 }

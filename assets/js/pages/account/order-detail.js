@@ -62,7 +62,7 @@ async function render() {
         </div>
         <div class="stack" style="gap:8px">
           <button class="btn btn-primary" data-again>${icon('rotate-ccw')} Buy again</button>
-          ${['pending', 'processing'].includes(o.status) ? `<button class="btn btn-outline text-danger" data-cancel>${icon('circle-x')} Cancel order</button>` : ''}
+          ${o.status === 'pending' ? `<button class="btn btn-outline text-danger" data-cancel>${icon('circle-x')} Cancel order</button>` : ''}
           ${o.status === 'delivered' && !dispute ? `<button class="btn btn-outline" data-return>${icon('undo-2')} Request return / refund</button>` : ''}
           <button class="btn btn-ghost" data-open-chat>${icon('bot')} Get help with this order</button>
         </div>
@@ -75,10 +75,12 @@ async function render() {
     toast(added ? `${added} item(s) added to cart` : 'Items are out of stock', added ? 'success' : 'error', added ? { action: 'View cart', href: routes.cart() } : {});
   };
   $('[data-cancel]')?.addEventListener('click', async () => {
-    if (!(await confirmDialog({ title: 'Cancel this order?', message: 'Paid orders are refunded to the original payment method within 5–7 days.', confirmText: 'Cancel order', danger: true }))) return;
-    await updateOrderStatus(o.id, 'cancelled');
-    toast('Order cancelled', 'info');
-    render();
+    if (!(await confirmDialog({ title: 'Cancel this order?', message: 'This pending order will be cancelled and its items returned to stock.', confirmText: 'Cancel order', danger: true }))) return;
+    try {
+      await updateOrderStatus(o.id, 'cancelled');
+      toast('Order cancelled', 'info');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   });
   $('[data-return]')?.addEventListener('click', () => {
     const m = openModal({
@@ -88,14 +90,16 @@ async function render() {
         <div class="field"><label>Details</label><textarea class="textarea" data-msg placeholder="Tell us what went wrong"></textarea></div></div>`,
       footer: '<button class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary" data-submit>Submit request</button>',
     });
-    m.el.querySelector('[data-submit]').onclick = () => {
-      db.insert('disputes', {
+    m.el.querySelector('[data-submit]').onclick = async () => {
+      try {
+        await db.insertAndSync('disputes', {
         id: `D-${Math.floor(600 + Math.random() * 400)}`, orderId: o.id, customerId: o.customerId, customerName: o.customerName, vendorId: o.items[0].vendorId,
         reason: m.el.querySelector('[data-reason]').value, message: m.el.querySelector('[data-msg]').value || '—', amount: o.total, status: 'open', createdAt: new Date().toISOString(),
-      });
-      m.close();
-      toast('Return request submitted. Our team will review it within 24 hours.');
-      render();
+        });
+        m.close();
+        toast('Return request submitted. Our team will review it within 24 hours.');
+        render();
+      } catch (error) { toast(error.message, 'error'); }
     };
   });
 }

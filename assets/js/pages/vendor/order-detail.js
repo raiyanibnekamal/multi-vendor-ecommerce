@@ -45,14 +45,16 @@ function render() {
       </div>
     </div>`;
   el.querySelectorAll('[data-to]').forEach((b) => (b.onclick = async () => {
-    await updateOrderStatus(o.id, b.dataset.to);
-    toast(`Order marked as ${b.dataset.to}. The customer sees it live.`);
-    render();
+    try {
+      await updateOrderStatus(o.id, b.dataset.to);
+      toast(`Order marked as ${b.dataset.to}. The customer sees it live.`);
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
   $('[data-cancel]')?.addEventListener('click', async () => {
     if (!(await confirmDialog({ title: 'Cancel order?', message: 'The customer will be notified and refunded.', confirmText: 'Cancel order', danger: true }))) return;
-    await updateOrderStatus(o.id, 'cancelled');
-    render();
+    try { await updateOrderStatus(o.id, 'cancelled'); render(); }
+    catch (error) { toast(error.message, 'error'); }
   });
 }
 

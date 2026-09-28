@@ -2,6 +2,34 @@
 import { store } from '../core/store.js';
 import { CONFIG } from '../core/config.js';
 import { db } from './db.js';
+import { getSupabase } from '../core/supabase.js';
+
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+let cartQueue = Promise.resolve();
+let wishlistQueue = Promise.resolve();
+
+function scheduleUserSync(kind, snapshot) {
+  if (CONFIG.USE_MOCK) return;
+  const key = kind === 'cart' ? 'cartQueue' : 'wishlistQueue';
+  const queue = key === 'cart' ? cartQueue : wishlistQueue;
+  const next = queue.catch(() => {}).then(async () => {
+    const supabase = await getSupabase();
+    if (!supabase) return;
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !UUID_PATTERN.test(authData.user?.id || '')) return;
+    const { error } = await supabase.rpc(kind === 'cart' ? 'sync_user_cart' : 'sync_user_wishlist', {
+      p_items: snapshot,
+    });
+    if (error) console.warn(`[StreamCart] ${kind} sync failed:`, error.message);
+  });
+  if (key === 'cart') cartQueue = next;
+  else wishlistQueue = next;
+}
+
+function saveCart(cart) {
+  store.set('cart', cart);
+  scheduleUserSync('cart', cart.map(({ productId, qty }) => ({ productId, qty })));
+}
 
 export function getCartRaw() {
   return store.get('cart', []);
@@ -25,7 +53,7 @@ export function addToCart(productId, qty = 1, source = 'store') {
   const line = cart.find((l) => l.productId === productId);
   if (line) line.qty = Math.min(p.stock, line.qty + qty);
   else cart.push({ productId, qty: Math.min(p.stock, qty), source, addedAt: Date.now() });
-  store.set('cart', cart);
+  saveCart(cart);
 }
 
 export function setQty(productId, qty) {
@@ -34,15 +62,15 @@ export function setQty(productId, qty) {
   if (!line) return;
   const p = db.get('products', productId);
   line.qty = Math.max(1, Math.min(p?.stock || 1, qty));
-  store.set('cart', cart);
+  saveCart(cart);
 }
 
 export function removeFromCart(productId) {
-  store.set('cart', getCartRaw().filter((l) => l.productId !== productId));
+  saveCart(getCartRaw().filter((l) => l.productId !== productId));
 }
 
 export function clearCart() {
-  store.set('cart', []);
+  saveCart([]);
 }
 
 export function totals(lines = getCart()) {
@@ -67,5 +95,6 @@ export function toggleWishlist(id) {
   if (i >= 0) list.splice(i, 1);
   else list.unshift(id);
   store.set('wishlist', list);
+  scheduleUserSync('wishlist', list);
   return i < 0;
 }

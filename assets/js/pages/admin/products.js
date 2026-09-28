@@ -64,15 +64,19 @@ function table() {
 
   $$('[data-page]').forEach((b) => (b.onclick = () => { state.page += +b.dataset.page; table(); }));
   $$('[data-status][data-id]').forEach((b) => (b.onclick = async () => {
-    await saveProduct({ id: b.dataset.id, status: b.dataset.status });
-    toast(b.dataset.status === 'blocked' ? 'Product blocked — hidden from the store' : 'Product restored', 'info');
-    table();
+    try {
+      await saveProduct({ id: b.dataset.id, status: b.dataset.status });
+      toast(b.dataset.status === 'blocked' ? 'Product blocked — hidden from the store' : 'Product restored', 'info');
+      table();
+    } catch (error) { toast(error.message, 'error'); }
   }));
   $$('[data-del]').forEach((b) => (b.onclick = async () => {
     if (!(await confirmDialog({ title: 'Delete this listing?', message: 'The vendor will be notified. This cannot be undone.', confirmText: 'Delete', danger: true }))) return;
-    await deleteProduct(b.dataset.del);
-    toast('Product deleted', 'info');
-    table();
+    try {
+      await deleteProduct(b.dataset.del);
+      toast('Product deleted', 'info');
+      table();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 

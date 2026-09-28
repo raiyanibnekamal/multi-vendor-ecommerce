@@ -42,9 +42,11 @@ function render() {
     const c = categoryById(b.dataset.del);
     const n = descendantIds(c.id).length - 1;
     if (!(await confirmDialog({ title: `Delete “${c.name}”?`, message: `${n ? `This also deletes ${n} sub-categories. ` : ''}Products in it (${productCount(c.id)}) will need to be re-categorised.`, confirmText: 'Delete', danger: true }))) return;
-    await deleteCategory(c.id);
-    toast('Category deleted', 'info');
-    render();
+    try {
+      await deleteCategory(c.id);
+      toast('Category deleted', 'info');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 
@@ -67,11 +69,13 @@ function edit(cat, parentId = cat?.parentId ?? null) {
     if (!name) return form.name.focus();
     const id = cat?.id || form.id.value.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     if (!cat && categoryById(id)) return toast('A category with this slug already exists', 'error');
-    await saveCategory({ id, name, parentId, ...(form.icon ? { icon: form.icon.value.trim() } : {}) });
-    if (parentId) collapsed.delete(parentId);
-    m.close();
-    toast(cat ? 'Category updated' : 'Category created');
-    render();
+    try {
+      await saveCategory({ id, name, parentId, ...(form.icon ? { icon: form.icon.value.trim() } : {}) });
+      if (parentId) collapsed.delete(parentId);
+      m.close();
+      toast(cat ? 'Category updated' : 'Category created');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   };
   m.el.querySelector('[data-ok]').onclick = save;
   form.onsubmit = (e) => { e.preventDefault(); save(); };

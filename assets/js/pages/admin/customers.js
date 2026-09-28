@@ -55,9 +55,11 @@ function table() {
     const u = db.get('users', b.dataset.block);
     const blocking = u.status !== 'blocked';
     if (blocking && !(await confirmDialog({ title: `Block ${u.name}?`, message: 'They will not be able to sign in, order or comment.', confirmText: 'Block', danger: true }))) return;
-    db.update('users', u.id, { status: blocking ? 'blocked' : 'active' });
-    toast(blocking ? 'Customer blocked' : 'Customer unblocked', 'info');
-    table();
+    try {
+      await db.updateAndSync('users', u.id, { status: blocking ? 'blocked' : 'active' });
+      toast(blocking ? 'Customer blocked' : 'Customer unblocked', 'info');
+      table();
+    } catch (error) { toast(error.message, 'error'); }
   }));
   $$('[data-view]').forEach((b) => (b.onclick = () => {
     const u = db.get('users', b.dataset.view);

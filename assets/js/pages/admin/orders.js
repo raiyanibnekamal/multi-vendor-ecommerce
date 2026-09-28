@@ -85,9 +85,11 @@ function manage(id) {
   });
   m.el.querySelector('[data-save]').onclick = async () => {
     const to = m.el.querySelector('[data-to]').value;
-    if (to !== o.status) { await updateOrderStatus(o.id, to); toast(`${o.id} → ${to}`); }
-    m.close();
-    render();
+    try {
+      if (to !== o.status) { await updateOrderStatus(o.id, to); toast(`${o.id} → ${to}`); }
+      m.close();
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   };
 }
 

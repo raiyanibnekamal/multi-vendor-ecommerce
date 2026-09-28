@@ -2,6 +2,7 @@ import { mountDashboard } from '../../components/dashboardLayout.js';
 import { emptyState } from '../../components/cards.js';
 import { escapeHtml, icon, avatar, timeAgo, formatDateTime, uid, $, $$ } from '../../core/utils.js';
 import { db } from '../../services/db.js';
+import { toast } from '../../components/toast.js';
 
 const el = mountDashboard({ role: 'vendor', active: 'messages', title: 'Messages' });
 let activeId = null;
@@ -53,13 +54,15 @@ function render() {
   body.scrollTop = body.scrollHeight;
   $$('[data-conv]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); activeId = a.dataset.conv; showList = false; render(); }));
   $('[data-back]').onclick = () => { showList = true; render(); };
-  const send = (text) => {
+  const send = async (text) => {
     if (!text.trim()) return;
-    db.update('conversations', conv.id, (c) => ({ messages: [...c.messages, { id: uid('msg'), from: 'vendor', text: text.trim(), createdAt: new Date().toISOString() }] }));
-    render();
+    try {
+      await db.sendConversationMessage(conv.vendorId, text.trim(), conv.id);
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   };
-  $('[data-form]').onsubmit = (e) => { e.preventDefault(); send(e.target.text.value); };
-  $$('[data-sug]').forEach((b) => (b.onclick = () => { $('[data-form]').text.value = b.dataset.sug; $('[data-form]').text.focus(); }));
+  $('[data-form]').onsubmit = async (e) => { e.preventDefault(); await send(e.target.text.value); e.target.reset(); };
+  $$('[data-sug]').forEach((b) => (b.onclick = async () => { await send(b.dataset.sug); }));
 }
 
 if (el) render();

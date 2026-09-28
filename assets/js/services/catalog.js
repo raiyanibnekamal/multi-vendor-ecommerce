@@ -1,6 +1,8 @@
 import { db, respond } from './db.js';
 import { seeded, uid } from '../core/utils.js';
 import { currentUser } from '../core/auth.js';
+import { CONFIG } from '../core/config.js';
+import { getSupabase } from '../core/supabase.js';
 
 // ---------- Categories (flat rows with parentId => nested tree) ----------
 export function getCategoriesSync() {
@@ -49,13 +51,15 @@ export function productCount(categoryId) {
 }
 
 export async function saveCategory(cat) {
-  if (cat.id && db.get('categories', cat.id)) db.update('categories', cat.id, cat);
-  else db.insert('categories', { ...cat, id: cat.id || uid('cat') });
-  return respond(cat);
+  const existing = cat.id && db.get('categories', cat.id);
+  const row = existing ? cat : { ...cat, id: cat.id || uid('cat') };
+  if (existing) await db.updateAndSync('categories', row.id, row);
+  else await db.insertAndSync('categories', row);
+  return respond(row);
 }
 
 export async function deleteCategory(id) {
-  descendantIds(id).forEach((cid) => db.remove('categories', cid));
+  for (const categoryId of descendantIds(id).reverse()) await db.removeAndSync('categories', categoryId);
   return respond(true);
 }
 
@@ -122,7 +126,7 @@ export async function getRelated(product, limit = 8) {
 
 export async function saveProduct(product) {
   if (product.id && db.get('products', product.id)) {
-    db.update('products', product.id, product);
+    await db.updateAndSync('products', product.id, product);
     return respond(db.get('products', product.id));
   }
   const row = {
@@ -131,17 +135,17 @@ export async function saveProduct(product) {
   };
   row.discount = row.originalPrice > row.price ? Math.round((1 - row.price / row.originalPrice) * 100) : 0;
   row.thumbnail ||= row.images[0] || '';
-  db.insert('products', row);
+  await db.insertAndSync('products', row);
   return respond(row);
 }
 
 export async function deleteProduct(id) {
-  db.remove('products', id);
+  await db.removeAndSync('products', id);
   return respond(true);
 }
 
 export async function updateStock(id, stock) {
-  db.update('products', id, { stock: Math.max(0, +stock) });
+  await db.updateAndSync('products', id, { stock: Math.max(0, +stock) });
   return respond(true);
 }
 
@@ -155,6 +159,8 @@ const REVIEW_TEXT = [
 const REVIEWERS = ['Rakib H.', 'Mim A.', 'Sabbir R.', 'Nabila I.', 'Fahim C.', 'Tania S.', 'Jubayer A.', 'Riya D.', 'Sumaiya K.'];
 
 export async function getReviews(productId) {
+  const own = db.where('reviews', (r) => r.productId === productId);
+  if (!CONFIG.USE_MOCK) return respond(own);
   const product = db.get('products', productId);
   const rnd = seeded(productId);
   const n = 3 + Math.floor(rnd() * 4);
@@ -167,13 +173,36 @@ export async function getReviews(productId) {
       createdAt: new Date(Date.now() - Math.floor(rnd() * 90) * 86400000).toISOString(),
     };
   });
-  const own = db.where('reviews', (r) => r.productId === productId);
   return respond([...own, ...seededReviews]);
 }
 
 export async function addReview(productId, rating, text) {
   const user = currentUser();
-  const review = { id: uid('rev'), productId, userId: user.id, userName: user.name, rating, text, verified: true, createdAt: new Date().toISOString() };
-  db.insert('reviews', review);
+  if (!user) throw new Error('Sign in to review a product.');
+  const isLiveAccount = !CONFIG.USE_MOCK && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(user.id);
+  let review;
+  if (isLiveAccount) {
+    const supabase = await getSupabase();
+    if (!supabase) throw new Error('Review service is unavailable. Please try again.');
+    const { data, error } = await supabase.rpc('create_verified_review', {
+      p_product_id: productId,
+      p_rating: rating,
+      p_comment: text,
+    });
+    if (error) throw new Error(error.message || 'A delivered purchase is required to review this product.');
+    review = {
+      ...data,
+      productId: data.product_id,
+      userId: data.user_id,
+      userName: data.user_name,
+      text: data.comment || '',
+      verified: data.verified_purchase,
+      createdAt: data.created_at,
+    };
+    db.insertLocal('reviews', review);
+  } else {
+    review = { id: uid('rev'), productId, userId: user.id, userName: user.name, rating, text, verified: true, createdAt: new Date().toISOString() };
+    db.insertLocal('reviews', review);
+  }
   return respond(review);
 }

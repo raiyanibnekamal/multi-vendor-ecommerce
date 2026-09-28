@@ -51,9 +51,11 @@ function table() {
         </tr>`).join('')}</tbody>
     </table></div>` : emptyState('shopping-bag', 'No orders here', 'Orders matching your filters will appear here.');
   $$('[data-next]').forEach((b) => (b.onclick = async () => {
-    await updateOrderStatus(b.dataset.next, b.dataset.to);
-    toast(`${b.dataset.next} → ${b.dataset.to}`);
-    render();
+    try {
+      await updateOrderStatus(b.dataset.next, b.dataset.to);
+      toast(`${b.dataset.next} → ${b.dataset.to}`);
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 

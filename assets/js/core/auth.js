@@ -2,6 +2,7 @@
 // Role checks here are only for UX; real enforcement belongs to RLS policies.
 import { store } from './store.js';
 import { CONFIG } from './config.js';
+import { getSupabase } from './supabase.js';
 import { routes, dashboardFor } from './routes.js';
 import { db, respond } from '../services/db.js';
 import { uid } from './utils.js';
@@ -39,7 +40,7 @@ async function syncAuthUser(supabase, authUser) {
     id: authUser.id,
     name: profile?.name || metadata.name || existing?.name || authUser.email?.split('@')[0] || 'Customer',
     email: authUser.email || profile?.email || '',
-    role: profile?.role || metadata.role || existing?.role || 'customer',
+    role: profile?.role || 'customer',
     vendorId: profile?.vendor_id || existing?.vendorId || null,
     phone: profile?.phone || metadata.phone || existing?.phone || '',
     status: profile?.status || 'active',
@@ -54,11 +55,25 @@ async function syncAuthUser(supabase, authUser) {
 export async function login(email, password) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const localUser = db.all('users').find((user) => user.email.toLowerCase() === normalizedEmail);
+  const demoAccount = Object.entries(CONFIG.DEMO_ACCOUNTS).find(([, account]) => account.email.toLowerCase() === normalizedEmail);
+
   if (isDemoAccount(normalizedEmail) || CONFIG.USE_MOCK) {
     await respond(null, 350);
-    if (!localUser || localUser.password !== password) throw new Error('Invalid email or password.');
-    if (localUser.status === 'blocked') throw new Error('This account has been suspended. Contact support.');
-    return startSession(localUser);
+
+    const demoUser = localUser || (demoAccount ? {
+      id: uid('u'),
+      name: demoAccount[0] === 'admin' ? 'Platform Admin' : demoAccount[0] === 'vendor' ? 'Vendor Demo' : 'Customer Demo',
+      email: normalizedEmail,
+      password: demoAccount[1].password,
+      role: demoAccount[0],
+      status: 'active',
+      joinedAt: new Date().toISOString(),
+    } : null);
+
+    if (!demoUser || demoUser.password !== password) throw new Error('Invalid email or password.');
+    if (demoUser.status === 'blocked') throw new Error('This account has been suspended. Contact support.');
+    db.insertLocal('users', demoUser);
+    return startSession(demoUser);
   }
 
   const supabase = await getSupabase();
@@ -66,7 +81,9 @@ export async function login(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
   if (error) throw new Error(error.message || 'Invalid email or password.');
   if (!data.user) throw new Error('Supabase did not return an authenticated user.');
-  return startSession(await syncAuthUser(supabase, data.user));
+  const user = startSession(await syncAuthUser(supabase, data.user));
+  await db.syncNow();
+  return user;
 }
 
 export function demoLogin(role) {
@@ -100,7 +117,7 @@ export async function register({ name, email, password, phone, role, storeName, 
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password,
-    options: { data: { name, role, phone } },
+    options: { data: { name, role, phone, storeName, storeCategory } },
   });
   if (error) throw new Error(error.message || 'Could not create your account.');
   if (!data.user || !data.session) {
@@ -108,24 +125,28 @@ export async function register({ name, email, password, phone, role, storeName, 
   }
 
   const user = await syncAuthUser(supabase, data.user);
-  if (role === 'vendor') {
-    const vendor = {
-      id: uid('v'), name: storeName, slug: storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ownerId: data.user.id, ownerName: name,
-      email: email.trim().toLowerCase(), phone, location: 'Dhaka', color: '#2563eb', description: `${storeName} — ${storeCategory || 'General store'}`,
-      status: 'pending', verified: false, rating: 0, followers: 0, joinedAt: user.joinedAt, commissionRate: 10, balance: 0,
-    };
-    const { error: vendorError } = await supabase.from('vendors').insert({
-      id: vendor.id, owner_id: data.user.id, name: vendor.name, slug: vendor.slug, owner_name: name,
-      email: vendor.email, phone, location: vendor.location, color: vendor.color, description: vendor.description,
-      status: 'pending', verified: false, rating: 0, followers: 0, commission_rate: 10, balance: 0,
-    });
-    if (vendorError) throw new Error(vendorError.message || 'Your account was created, but the store could not be created.');
-    const { error: profileError } = await supabase.from('profiles').update({ vendor_id: vendor.id }).eq('id', data.user.id);
-    if (profileError) console.warn('[StreamCart Auth] Vendor profile link failed:', profileError.message);
-    db.insertLocal('vendors', vendor);
-    user.vendorId = vendor.id;
+  if (role === 'vendor' && !user.vendorId) throw new Error('Your account was created, but the store profile is missing. Contact support.');
+  const signedInUser = startSession(user);
+  await db.syncNow();
+  return signedInUser;
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  const user = currentUser();
+  if (!user) throw new Error('Sign in before changing your password.');
+  const isLiveAccount = !CONFIG.USE_MOCK && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(user.id);
+  if (!isLiveAccount) {
+    if (user.password !== currentPassword) throw new Error('Current password is incorrect.');
+    db.updateLocal('users', user.id, { password: newPassword });
+    return;
   }
-  return startSession(user);
+
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error('Password service is unavailable. Please try again.');
+  const { data, error } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
+  if (error || data.user?.id !== user.id) throw new Error('Current password is incorrect.');
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+  if (updateError) throw new Error(updateError.message || 'Could not update the password.');
 }
 
 export async function logout(redirect = true) {
@@ -137,6 +158,8 @@ export async function logout(redirect = true) {
       console.warn('[StreamCart Auth] Remote sign-out failed:', err);
     }
   }
+  store.remove('cart');
+  store.remove('wishlist');
   store.remove('session');
   if (redirect) location.href = routes.home();
 }

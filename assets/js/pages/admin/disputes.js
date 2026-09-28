@@ -16,12 +16,12 @@ function render() {
   const list = tab === 'active' ? all.filter(isActive) : tab === 'resolved' ? all.filter((d) => !isActive(d)) : all;
   const refunded = all.filter((d) => d.status === 'resolved_refund').reduce((s, d) => s + d.amount, 0);
   el.innerHTML = `
-    <div class="dash-head"><div><h2>Disputes & refunds</h2><p>Mediate between buyers and sellers. Refunds are issued via the original payment method.</p></div></div>
+    <div class="dash-head"><div><h2>Disputes & refunds</h2><p>Mediate between buyers and sellers. Approved refunds must be processed through the payment provider.</p></div></div>
     <div class="stats">
       <div class="stat"><span class="ic amber">${icon('circle-alert')}</span><div><div class="lbl">Open</div><div class="val">${all.filter((d) => d.status === 'open').length}</div></div></div>
       <div class="stat"><span class="ic">${icon('search')}</span><div><div class="lbl">In review</div><div class="val">${all.filter((d) => d.status === 'in_review').length}</div></div></div>
       <div class="stat"><span class="ic green">${icon('circle-check')}</span><div><div class="lbl">Resolved</div><div class="val">${all.filter((d) => !isActive(d)).length}</div></div></div>
-      <div class="stat"><span class="ic red">${icon('undo-2')}</span><div><div class="lbl">Refunded</div><div class="val">${formatPrice(refunded)}</div></div></div>
+      <div class="stat"><span class="ic red">${icon('undo-2')}</span><div><div class="lbl">Refund approved</div><div class="val">${formatPrice(refunded)}</div></div></div>
     </div>
     <div class="card mt-2">
       <div class="tabs" style="padding:0 12px">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>
@@ -62,17 +62,18 @@ function open(id) {
       ${isActive(d) ? `<div class="field"><label>Internal note / message to both parties</label><textarea class="textarea" data-note placeholder="Add a note…"></textarea></div>` : ''}
     </div>`,
     footer: isActive(d)
-      ? `${d.status === 'open' ? '<button class="btn btn-outline" data-set="in_review">Start review</button>' : ''}<button class="btn btn-outline" data-set="resolved_rejected">Reject claim</button><button class="btn btn-success" data-set="resolved_refund">${icon('undo-2')} Refund ${formatPrice(d.amount)}</button>`
+      ? `${d.status === 'open' ? '<button class="btn btn-outline" data-set="in_review">Start review</button>' : ''}<button class="btn btn-outline" data-set="resolved_rejected">Reject claim</button><button class="btn btn-success" data-set="resolved_refund">${icon('undo-2')} Approve refund ${formatPrice(d.amount)}</button>`
       : '<button class="btn btn-outline" data-close>Close</button>',
   });
-  $$('[data-set]', m.el).forEach((b) => (b.onclick = () => {
+  $$('[data-set]', m.el).forEach((b) => (b.onclick = async () => {
     const note = m.el.querySelector('[data-note]')?.value.trim();
     const status = b.dataset.set;
-    db.update('disputes', d.id, (x) => ({ status, notes: note ? [...(x.notes || []), { text: note, at: new Date().toISOString() }] : x.notes }));
-    if (status === 'resolved_refund' && order) db.update('orders', order.id, { paymentStatus: 'refunded' });
-    m.close();
-    toast(status === 'resolved_refund' ? 'Refund issued to customer' : status === 'in_review' ? 'Case moved to review' : 'Claim rejected', status === 'resolved_refund' ? 'success' : 'info');
-    render();
+    try {
+      await db.resolveDispute(d.id, status, note);
+      m.close();
+      toast(status === 'resolved_refund' ? 'Refund approved. Process it through the payment provider.' : status === 'in_review' ? 'Case moved to review' : 'Claim rejected', 'info');
+      render();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 

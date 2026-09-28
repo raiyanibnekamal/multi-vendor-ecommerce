@@ -46,9 +46,9 @@ docs/ARCHITECTURE.md
 
 ## 3. Data and service architecture
 
-`services/db.js` exposes `all / get / where / insert / update / remove`. It initializes from seed data/localStorage and asynchronously hydrates configured tables from Supabase. Supabase Auth is used for non-demo accounts; seeded demo accounts remain local. Orders are written remotely only for a matching authenticated Supabase UUID. Checkout awaits separate order-header and order-item writes, then updates product stock separately; it does not call the SQL `place_order_atomic` RPC, so the full operation is not atomic. If remote reads fail, local/demo data remains available.
+`services/db.js` exposes `all / get / where / insert / update / remove`. It initializes from seed data/localStorage and asynchronously hydrates configured tables from Supabase, including clearing stale demo rows when a live query succeeds with no rows. Supabase Auth is used for non-demo accounts; seeded demo accounts remain local. With migrations through 08 applied, live checkout requires the matching authenticated Supabase UUID and calls `place_order_atomic`; the database derives prices, totals, and stock changes in one transaction. Demo orders remain local.
 
-The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Live order reads require the RLS recursion fix in `supabase/migrations/07_rls_recursion_fix.sql`; apply that migration to existing databases before relying on the orders workflow.
+The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Apply migrations through `08_backend_security_and_atomic_flows.sql` to existing databases before relying on live registration, order, follow, storage, dispute, or payout workflows.
 
 ### 3.1 Tables (Postgres)
 
@@ -71,9 +71,9 @@ The current Supabase project URL and anon/publishable key are configured in `ass
 ### 3.2 Row Level Security (implemented intent)
 
 - **Customers**: read approved vendors / active products / approved reels; read & write only their own cart, wishlist, orders, likes, comments.
-- **Vendors**: product/order access is scoped by vendor ID. The current vendor-row UPDATE policy checks ownership but does not enforce column-level restrictions for `commission_rate`, `status` or `verified`; harden this before treating those fields as protected.
-- **Admins**: `is_admin()` helper grants all; moderation/status columns are writable **only** by admins (column-level policy or RPC).
-- Order INSERT policies are restricted to authenticated customers and customer-owned orders/items. Guest checkout is intentionally unsupported.
+- **Vendors**: product/order access is scoped by vendor ID. Migration 08 adds a trigger that prevents vendor owners changing ownership, approval, verification, rating, follower, commission, or balance fields; store-profile fields remain editable.
+- **Admins**: `is_admin()` helper grants all; migration 08 routes order and dispute resolution through admin-checked RPCs.
+- Direct customer INSERT policies for orders/items are removed by migration 08. Authenticated checkout uses the server-priced `place_order_atomic` RPC; guest checkout is unsupported.
 - Client role guards are UX only; RLS is the enforcement boundary. The deployed database's migration state must be verified separately. Payment capture, payouts, and refunds still need trusted server-side workflows before production use.
 
 ### 3.3 Storage buckets
@@ -100,11 +100,13 @@ Presence (viewer count) is currently simulated/local; production viewer presence
 | Function | Status and purpose |
 |---|---|
 | `api/ai.js` | Implemented Vercel function; validates allowlisted AI actions and calls Groq using server-only `GROQ_API_KEY`. |
-| `place_order_atomic` (`05_rpc.sql`) | Defined in SQL but not called by the current frontend checkout. The UI writes order header/items separately and adjusts stock separately. |
-| `checkout`, `payment-webhook` | No payment-provider integration is present. The current frontend marks non-COD orders paid without provider confirmation; this is demo behavior, not a valid payment signal. |
+| `place_order_atomic` (`05_rpc.sql`, hardened by migration 08) | Called by live checkout after migration 08; prices, coupons, shipping, stock locks, order rows, and items are handled in one transaction. |
+| `handle_new_user` (migration 08) | Creates the profile and pending vendor store inside the auth trigger, so email-confirmation signup does not lose the store record. |
+| `checkout`, `payment-webhook` | No payment-provider integration is present. Live checkout permits COD only; online methods are rejected until a provider confirms payment server-side. |
 | `live-token` | Planned. Live video transport is currently sample media/demo simulation. |
 | `moderate-reel` | Groq review is available on demand as decision support; human moderation remains authoritative. |
-| `payout-process`, `dispute-resolve` | Planned trusted server-side money operations. |
+| `request_vendor_payout`, `admin_update_payout_status` (migration 08) | Authenticated RPCs reserve and restore vendor balances transactionally; actual bank/wallet transfer remains a manual external operation. |
+| `admin_resolve_dispute` (migration 08) | Admin-only case/status resolution; refund approval is recorded, but issuing money remains an external/manual operation. |
 
 ---
 
@@ -148,7 +150,7 @@ The browser calls only the same-origin `/api/ai` endpoint. When configured, `GRO
 
 ## 7. Backend readiness and deployment notes
 
-The following diagrams and tables describe the intended backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order, including `06_auth_order_hardening.sql` and `07_rls_recursion_fix.sql`; live orders previously returned PostgreSQL `42P17` until the RLS recursion fix is applied. No database migration is run automatically by the frontend deployment.
+The following diagrams and tables describe the backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order through `08_backend_security_and_atomic_flows.sql`; the frontend does not run database migrations automatically.
 
 ### 7.1 Architecture & Component Map
 
@@ -218,11 +220,11 @@ The following diagrams and tables describe the intended backend boundary, not a 
 | `reels` | Read approved reels | Read approved + Like/Comment | Full CRUD on own reels | Moderate / Delete |
 | `live_streams` | Read live/scheduled | Read + Chat in stream | Full CRUD on own streams | Full CRUD |
 | `carts` / `wishlists` | None | Own rows only | Own rows only | Full CRUD |
-| `orders` | None | Read own; insert own authenticated order | Read orders containing own items | Full CRUD |
+| `orders` | None | Read own; create through atomic RPC | Read orders containing own items | Full CRUD |
 | `order_items` | None | Read items in own orders | Read & update own items only | Full CRUD |
 | `payouts` | None | None | Create & view own payouts | Approve / Reject / Pay |
 
-This matrix summarizes intended access, not a live database attestation. In the current SQL, vendor updates are ownership-scoped but not restricted by column; verify and harden sensitive vendor fields before production.
+This matrix summarizes source and migration intent, not a live database attestation. Confirm migration 08 is applied before enabling live registration, checkout, order, follow, Storage, dispute, or payout workflows.
 
 ### 7.4 Implementation Roadmap
 

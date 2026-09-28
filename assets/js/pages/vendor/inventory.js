@@ -43,7 +43,10 @@ function render() {
 
   $$('[data-f]').forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
   $$('[data-step]').forEach((b) => (b.onclick = () => { const i = $(`[data-stock="${b.dataset.id}"]`); i.value = Math.max(0, (+i.value || 0) + +b.dataset.step); }));
-  $$('[data-save]').forEach((b) => (b.onclick = async () => { await updateStock(b.dataset.save, $(`[data-stock="${b.dataset.save}"]`).value); toast('Stock updated'); render(); }));
+  $$('[data-save]').forEach((b) => (b.onclick = async () => {
+    try { await updateStock(b.dataset.save, $(`[data-stock="${b.dataset.save}"]`).value); toast('Stock updated'); render(); }
+    catch (error) { toast(error.message, 'error'); }
+  }));
   $('[data-restock]').onclick = async () => {
     const items = all.filter((p) => p.stock <= 10);
     for (const p of items) await updateStock(p.id, p.stock + 25);

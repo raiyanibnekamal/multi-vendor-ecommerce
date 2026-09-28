@@ -140,7 +140,7 @@ function bind() {
 
     let uploadedVideoUrl = previewUrl;
     if (videoFile) {
-      uploadedVideoUrl = await uploadFile('reels', videoFile);
+      uploadedVideoUrl = await uploadFile('reels', videoFile, `${el.vendor.id}/${crypto.randomUUID()}_${videoFile.name}`);
     }
 
     const first = db.get('products', tagged[0]);

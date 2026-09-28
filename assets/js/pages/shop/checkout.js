@@ -14,7 +14,7 @@ import { t as tr } from '../../core/i18n.js';
 const user = requireRole();
 const main = mountShell({ active: 'checkout' });
 let addressId = user?.addresses?.find((a) => a.isDefault)?.id || user?.addresses?.[0]?.id || 'new';
-let pay = 'card';
+let pay = 'cod';
 
 function addressCards() {
   const list = user.addresses || [];
@@ -40,7 +40,7 @@ function addressCards() {
 function paymentHtml() {
   return `
     <div class="stack" style="gap:10px">
-      ${PAYMENT_METHODS.map((pm) => `<label class="radio-card"><input type="radio" name="pay" value="${pm.id}" ${pay === pm.id ? 'checked' : ''}>${icon(pm.icon)}<div class="grow"><b class="small">${tr(pm.name)}</b><div class="xs muted">${tr(pm.note)}</div></div></label>`).join('')}
+      ${PAYMENT_METHODS.filter((pm) => pm.id === 'cod').map((pm) => `<label class="radio-card"><input type="radio" name="pay" value="${pm.id}" checked>${icon(pm.icon)}<div class="grow"><b class="small">${tr(pm.name)}</b><div class="xs muted">${tr(pm.note)}</div></div></label>`).join('')}
     </div>
     <div data-pay-extra class="mt-2">${payExtra()}</div>`;
 }
@@ -115,7 +115,10 @@ function bind(lines, coupon) {
     if (addressId === 'new') {
       address = { id: uid('a'), label: f.label.value, name: f.name.value.trim(), phone: f.phone.value.trim(), line: f.line.value.trim(), area: f.area.value.trim(), isDefault: !(user.addresses || []).length };
       if (!address.name || !address.phone || !address.line || !address.area) return toast(tr('Please complete the delivery address'), 'error');
-      if (f.save.checked) db.update('users', user.id, (u) => ({ addresses: [...(u.addresses || []), address] }));
+      if (f.save.checked) {
+        try { await db.updateAndSync('users', user.id, (current) => ({ addresses: [...(current.addresses || []), address] })); }
+        catch (error) { return toast(error.message, 'error'); }
+      }
     } else {
       address = user.addresses.find((a) => a.id === addressId);
     }

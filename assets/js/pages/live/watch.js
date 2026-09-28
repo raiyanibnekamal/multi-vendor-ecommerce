@@ -5,7 +5,7 @@ import { toast } from '../../components/toast.js';
 import { emptyState, loading } from '../../components/cards.js';
 import { routes } from '../../core/routes.js';
 import { escapeHtml, icon, qs, $, $$, avatar, formatNumber, formatPrice, timeUntil, formatDateTime } from '../../core/utils.js';
-import { getStream, streamSync, streamChannel, sendChat, sendReaction, simulateAudience, REACTIONS } from '../../services/live.js';
+import { getStream, getStreamMessages, streamSync, streamChannel, sendChat, sendReaction, toggleStreamLike, simulateAudience, REACTIONS } from '../../services/live.js';
 import { SAMPLE_VIDEOS } from '../../services/reels.js';
 import { vendorSync, isFollowing, toggleFollow } from '../../services/vendors.js';
 import { currentUser } from '../../core/auth.js';
@@ -68,6 +68,7 @@ async function render() {
     return;
   }
   const v = vendorSync(s.vendorId);
+  const chatHistory = getStreamMessages(s.id);
   document.title = `${s.title} · Live · StreamCart`;
   const statusBadge = s.status === 'live' ? '<span class="badge badge-live">LIVE</span>' : s.status === 'ended' ? '<span class="badge badge-dark">REPLAY</span>' : '';
 
@@ -117,7 +118,8 @@ async function render() {
 
   bind(s, v);
   if (s.status === 'live') startRealtime(s);
-  if (s.status === 'ended') replayChat();
+  chatHistory.forEach(addChat);
+  if (s.status === 'ended' && !chatHistory.length) replayChat();
   if (s.status === 'scheduled') {
     const el = $('[data-countdown]');
     setInterval(() => el && (el.textContent = timeUntil(s.scheduledAt)), 30000);
@@ -194,9 +196,11 @@ function bind(s, v) {
   $('[data-follow]').onclick = async (e) => {
     const btn = e.currentTarget;
     if (!(await ensureLogin('Sign in to follow stores'))) return;
-    const now = toggleFollow(v.id);
-    btn.className = `btn ${now ? 'btn-soft' : 'btn-primary'}`;
-    btn.innerHTML = now ? 'Following' : `${icon('plus')} Follow`;
+    try {
+      const now = await toggleFollow(v.id);
+      btn.className = `btn ${now ? 'btn-soft' : 'btn-primary'}`;
+      btn.innerHTML = now ? 'Following' : `${icon('plus')} Follow`;
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-remind]')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
@@ -206,11 +210,13 @@ function bind(s, v) {
     btn.innerHTML = `${icon('bell')} ${on ? 'Reminder set' : 'Remind me'}`;
     toast(on ? "We'll notify you when it starts" : 'Reminder removed', on ? 'success' : 'info');
   });
-  $$('[data-react]').forEach((b) => (b.onclick = () => {
+  $$('[data-react]').forEach((b) => (b.onclick = async () => {
     sendReaction(s.id, b.dataset.react);
-    const el = $('[data-likes]');
-    db.update('streams', s.id, (st) => ({ likes: st.likes + 1 }));
-    if (el) el.textContent = formatNumber(streamSync(s.id).likes);
+    try {
+      const result = await toggleStreamLike(s.id);
+      const el = $('[data-likes]');
+      if (el) el.textContent = formatNumber(result.likes);
+    } catch (error) { toast(error.message, 'error'); }
   }));
   $('[data-chat-form]')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -219,8 +225,10 @@ function bind(s, v) {
     if (!text) return;
     const user = await ensureLogin('Sign in to chat');
     if (!user) return;
-    sendChat(s.id, { userId: user.id, userName: user.name.split(' ')[0], text, role: user.vendorId === s.vendorId ? 'host' : 'viewer' });
-    input.value = '';
+    try {
+      await sendChat(s.id, { userId: user.id, userName: user.name.split(' ')[0], text, role: user.vendorId === s.vendorId ? 'host' : 'viewer' });
+      input.value = '';
+    } catch (error) { toast(error.message, 'error'); }
   });
 }
 
@@ -230,7 +238,7 @@ main.addEventListener('click', (e) => {
   track('view', { productId: b.dataset.buy });
   openQuickBuy(b.dataset.buy, {
     source: 'live',
-    onDone: () => sendChat(id, { role: 'system', text: `🎉 ${currentUser()?.name.split(' ')[0]} just placed an order!` }),
+    onDone: () => { void sendChat(id, { role: 'system', text: `🎉 ${currentUser()?.name.split(' ')[0]} just placed an order!` }).catch((error) => toast(error.message, 'error')); },
   });
 });
 window.addEventListener('beforeunload', () => stopSim?.());

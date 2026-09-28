@@ -75,7 +75,7 @@ function bind() {
   const addFiles = async (files) => {
     toast('Uploading image(s)...', 'info');
     for (const file of [...files].filter((x) => x.type.startsWith('image/')).slice(0, 6)) {
-      const url = await uploadFile('product-images', file);
+      const url = await uploadFile('product-images', file, `${el.vendor.id}/${crypto.randomUUID()}_${file.name}`);
       if (url) images.push(url);
     }
     previews();

@@ -7,6 +7,7 @@ import { getWishlistIds } from '../../services/cart.js';
 import { getList } from '../../services/userdata.js';
 import { recentlyViewedIds } from '../../services/ai.js';
 import { db } from '../../services/db.js';
+import { changePassword } from '../../core/auth.js';
 
 const el = mountAccount('profile');
 if (el) render(el.user);
@@ -35,7 +36,7 @@ function render(user) {
         <div class="card-head"><h3>Personal information</h3></div>
         <div class="card-body stack">
           <div class="field"><label>Full name</label><input class="input" name="name" value="${escapeHtml(user.name)}" required></div>
-          <div class="field"><label>Email</label><input class="input" type="email" name="email" value="${escapeHtml(user.email)}" required></div>
+          <div class="field"><label>Email (managed by sign-in)</label><input class="input" type="email" name="email" value="${escapeHtml(user.email)}" readonly></div>
           <div class="field"><label>Phone</label><input class="input" name="phone" value="${escapeHtml(user.phone || '')}"></div>
           <button class="btn btn-primary" style="width:fit-content">Save changes</button>
         </div>
@@ -54,19 +55,22 @@ function render(user) {
 
     ${viewed.length ? `<section class="section"><div class="section-head"><h3>Recently viewed</h3></div><div class="grid-products">${viewed.map(productCard).join('')}</div></section>` : ''}`;
 
-  $('[data-profile]').onsubmit = (e) => {
+  $('[data-profile]').onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target;
-    db.update('users', user.id, { name: f.name.value.trim(), email: f.email.value.trim(), phone: f.phone.value.trim() });
-    toast('Profile updated');
-    render(db.get('users', user.id));
+    try {
+      await db.updateAndSync('users', user.id, { name: f.name.value.trim(), phone: f.phone.value.trim() });
+      toast('Profile updated');
+      render(db.get('users', user.id));
+    } catch (error) { toast(error.message, 'error'); }
   };
-  $('[data-password]').onsubmit = (e) => {
+  $('[data-password]').onsubmit = async (e) => {
     e.preventDefault();
     const f = e.target;
-    if (f.current.value !== user.password) return toast('Current password is incorrect', 'error');
-    db.update('users', user.id, { password: f.next.value });
-    f.reset();
-    toast('Password updated');
+    try {
+      await changePassword(f.current.value, f.next.value);
+      f.reset();
+      toast('Password updated');
+    } catch (error) { toast(error.message, 'error'); }
   };
 }

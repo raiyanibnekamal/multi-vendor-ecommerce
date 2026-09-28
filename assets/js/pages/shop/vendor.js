@@ -61,10 +61,12 @@ async function render() {
   $('[data-follow]').onclick = async (e) => {
     const btn = e.currentTarget;
     if (!(await ensureLogin('Sign in to follow stores'))) return;
-    const now = toggleFollow(v.id);
-    btn.className = `btn ${now ? 'btn-soft' : 'btn-primary'}`;
-    btn.innerHTML = now ? `${icon('check')} Following` : `${icon('plus')} Follow`;
-    $('[data-followers]').textContent = formatNumber(vendorSync(v.id).followers);
+    try {
+      const now = await toggleFollow(v.id);
+      btn.className = `btn ${now ? 'btn-soft' : 'btn-primary'}`;
+      btn.innerHTML = now ? `${icon('check')} Following` : `${icon('plus')} Follow`;
+      $('[data-followers]').textContent = formatNumber(vendorSync(v.id).followers);
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-share]').onclick = () => navigator.clipboard?.writeText(location.href);
   $$('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; body(v, reels, streams); }));

@@ -145,9 +145,11 @@ async function showTab(tab, p) {
     $('[data-review-form]').onsubmit = async (e) => {
       e.preventDefault();
       if (!(await ensureLogin(tr('Sign in to write a review')))) return;
-      await addReview(p.id, rating, e.target.text.value.trim());
-      toast(tr('Thanks! Your review was posted.'));
-      showTab('reviews', p);
+      try {
+        await addReview(p.id, rating, e.target.text.value.trim());
+        toast(tr('Thanks! Your review was posted.'));
+        showTab('reviews', p);
+      } catch (error) { toast(error.message, 'error'); }
     };
   }
 }
@@ -178,9 +180,11 @@ function bind(p, v) {
   $('[data-follow]').onclick = async (e) => {
     const btn = e.currentTarget;
     if (!(await ensureLogin(tr('Sign in to follow stores')))) return;
-    const now = toggleFollow(v.id);
-    btn.textContent = now ? tr('Following') : tr('Follow');
-    btn.className = `btn btn-sm ${now ? 'btn-soft' : 'btn-primary'}`;
+    try {
+      const now = await toggleFollow(v.id);
+      btn.textContent = now ? tr('Following') : tr('Follow');
+      btn.className = `btn btn-sm ${now ? 'btn-soft' : 'btn-primary'}`;
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-message]').onclick = async () => {
     const user = await ensureLogin(tr('Sign in to chat with the seller'));
@@ -191,15 +195,15 @@ function bind(p, v) {
         <textarea class="textarea" data-msg>Hi, I'm interested in "${escapeHtml(p.title)}". Is it available?</textarea>`,
       footer: `<button class="btn btn-outline" data-close>${tr('Cancel')}</button><button class="btn btn-primary" data-send>${tr('Send')}</button>`,
     });
-    m.el.querySelector('[data-send]').onclick = () => {
+    m.el.querySelector('[data-send]').onclick = async () => {
       const text = m.el.querySelector('[data-msg]').value.trim();
       if (!text) return;
       const conv = db.all('conversations').find((c) => c.vendorId === v.id && c.customerId === user.id);
-      const msg = { id: uid('msg'), from: 'customer', text, createdAt: new Date().toISOString() };
-      if (conv) db.update('conversations', conv.id, (c) => ({ messages: [...c.messages, msg] }));
-      else db.insert('conversations', { id: uid('m'), vendorId: v.id, customerId: user.id, messages: [msg] });
-      m.close();
-      toast(tr('Message sent to the seller'));
+      try {
+        await db.sendConversationMessage(v.id, text, conv?.id || null);
+        m.close();
+        toast(tr('Message sent to the seller'));
+      } catch (error) { toast(error.message, 'error'); }
     };
   };
   $$('[data-tab]').forEach((t) => (t.onclick = () => showTab(t.dataset.tab, p)));

@@ -3,7 +3,7 @@
 .hero-main .blob { position: absolute; border-radius: 50%; filter: blur(2px); pointer-events: none; }
 .hero-main .b1 { width: 420px; height: 420px; background: rgba(255,255,255,.08); right: -140px; top: -160px; }
 .hero-main .b2 { width: 260px; height: 260px; background: rgba(255,255,255,.06); left: -80px; bottom: -120px; }
-.hero-main .b3 { width: 140px; height: 140px; background: rgba(255,255,255,.1); right: 28%; top: 18%; animation: float 6s ease-in-out infinite; }
+.hero-main .b3 { width: 140px; height: 140px; background: rgba(255,255,255,.1); right: 28%; top: 18%; animation: none; }
 .hero-copy, .hero-visual { position: relative; z-index: 1; }
 .hero-main .eyebrow { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.16); padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; width: fit-content; margin-bottom: 16px; }
 .hero-main h1 { font-size: 42px; line-height: 1.08; max-width: 520px; }
@@ -17,15 +17,15 @@
 .hero-stats b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
 .hero-stats span { font-size: 12px; opacity: .8; }
 
-.hero-visual { position: relative; height: 360px; }
-.hero-visual .phone { position: absolute; right: 12px; bottom: -24px; width: 168px; aspect-ratio: 9/16; border-radius: 28px; overflow: hidden; border: 3px solid rgba(255,255,255,.45); box-shadow: 0 24px 50px rgba(0,0,0,.35); background: #000; }
+.hero-visual { position: relative; height: 360px; display: flex; align-items: center; justify-content: center; }
+.hero-visual .phone { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 178px; aspect-ratio: 9/16; border-radius: 28px; overflow: hidden; border: 3px solid rgba(255,255,255,.45); box-shadow: 0 24px 50px rgba(0,0,0,.35); background: #000; }
 .hero-visual .phone video { width: 100%; height: 100%; object-fit: cover; }
 .hero-visual .phone-ui { position: absolute; left: 10px; right: 10px; bottom: 12px; color: #fff; }
-.float-card { position: absolute; display: flex; align-items: center; gap: 8px; background: var(--float-bg); color: var(--text); border-radius: 14px; padding: 8px 10px; box-shadow: var(--shadow-lg); font-size: 12px; animation: float 5s ease-in-out infinite; }
-.float-product { left: -8px; bottom: 72px; width: min(220px, 100%); animation-delay: .4s; }
+.float-card { position: absolute; display: flex; align-items: center; gap: 8px; background: var(--float-bg); color: var(--text); border-radius: 14px; padding: 8px 10px; box-shadow: var(--shadow-lg); font-size: 12px; animation: none; transform: none; }
+.float-product { left: 18px; bottom: 96px; width: min(220px, 100%); animation: none; }
 .float-product img { width: 36px; height: 36px; border-radius: 8px; object-fit: contain; background: var(--surface-2); }
-.float-live { top: 28px; left: 0; color: #fff; background: rgba(239,68,68,.92); animation-delay: .8s; }
-.float-heart { top: 88px; right: 8px; }
+.float-live { top: 26px; left: 24px; color: #fff; background: rgba(239,68,68,.92); animation: none; }
+.float-heart { top: 112px; right: 10px; }
 
 .hero-side { display: grid; grid-template-rows: 1fr 1fr; gap: 16px; }
 .hero-tile { position: relative; border-radius: var(--radius-xl); overflow: hidden; padding: 22px; display: flex; flex-direction: column; justify-content: flex-end; color: #fff; min-height: 160px; background: #0f172a; }

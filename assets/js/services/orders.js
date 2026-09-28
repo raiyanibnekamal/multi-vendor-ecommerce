@@ -2,7 +2,7 @@ import { db, respond } from './db.js';
 import { channel } from './realtime.js';
 import { currentUser } from '../core/auth.js';
 import { CONFIG } from '../core/config.js';
-import { sleep } from '../core/utils.js';
+import { getSupabase } from '../core/supabase.js';
 
 export const PAYMENT_METHODS = [
   { id: 'card', name: 'Credit / Debit Card', note: 'Visa, Mastercard, Amex — secured by Stripe', icon: 'credit-card' },
@@ -25,18 +25,17 @@ export const COUPONS = {
 export async function placeOrder({ lines, address, paymentMethod, source = 'store', coupon = null }) {
   const user = currentUser();
   if (!user) throw new Error('Please sign in to place an order.');
+  if (paymentMethod !== 'cod') throw new Error('Online payments are not available yet. Please choose Cash on Delivery.');
   const items = lines.map(({ productId, qty }) => {
     const p = db.get('products', productId);
     if (!p || p.stock < qty) throw new Error(`${p?.title || 'A product'} doesn't have enough stock.`);
     return { productId, vendorId: p.vendorId, title: p.title, thumbnail: p.thumbnail, price: p.price, qty };
   });
-  if (paymentMethod !== 'cod') await sleep(900);
-
   const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
   const shipping = subtotal >= CONFIG.FREE_SHIPPING_MIN ? 0 : CONFIG.SHIPPING_FEE;
   const discount = coupon && COUPONS[coupon] ? COUPONS[coupon].apply(subtotal) : 0;
   const order = {
-    id: `ORD-${Math.floor(20000 + Math.random() * 70000)}`,
+    id: `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     customerId: user.id,
     customerName: user.name,
     items,
@@ -47,15 +46,14 @@ export async function placeOrder({ lines, address, paymentMethod, source = 'stor
     total: subtotal + shipping - discount,
     status: 'pending',
     paymentMethod,
-    paymentStatus: paymentMethod === 'cod' ? 'unpaid' : 'paid',
+    paymentStatus: 'unpaid',
     source,
     address,
     createdAt: new Date().toISOString(),
   };
-  await db.insertAndSync('orders', order);
-  items.forEach((it) => db.update('products', it.productId, (p) => ({ stock: p.stock - it.qty, sold: p.sold + it.qty })));
-  channel('orders').send('order:new', order, { remote: false });
-  return respond(order, 200);
+  const persistedOrder = await db.placeOrderAtomic(order);
+  channel('orders').send('order:new', persistedOrder, { remote: false });
+  return respond(persistedOrder, 200);
 }
 
 export async function getMyOrders() {
@@ -86,10 +84,51 @@ export async function getAllOrders() {
 }
 
 export async function updateOrderStatus(id, status) {
-  const order = db.update('orders', id, (o) => ({
-    status,
-    paymentStatus: status === 'cancelled' ? (o.paymentStatus === 'paid' ? 'refunded' : 'unpaid') : status === 'delivered' ? 'paid' : o.paymentStatus,
-  }));
+  const user = currentUser();
+  const isLiveAccount = !CONFIG.USE_MOCK && typeof user?.id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(user.id);
+  let order;
+
+  if (isLiveAccount && ['vendor', 'customer', 'admin'].includes(user.role)) {
+    const supabase = await getSupabase();
+    if (!supabase) throw new Error('Order service is unavailable. Please try again.');
+    const rpc = user.role === 'vendor'
+      ? ['update_vendor_order_status', { p_order_id: id, p_status: status }]
+      : user.role === 'admin'
+          ? ['admin_update_order_status', { p_order_id: id, p_status: status }]
+          : status === 'cancelled'
+            ? ['cancel_my_order', { p_order_id: id }]
+            : null;
+    if (!rpc) throw new Error('Customers can only cancel pending orders.');
+    const { data, error } = await supabase.rpc(rpc[0], rpc[1]);
+    if (error) throw new Error(error.message || 'Could not update this order.');
+    const itemStatuses = new Map((data.items || []).map((item) => [item.product_id, item.status]));
+    order = db.updateLocal('orders', id, (previous) => ({
+      status: data.order.status,
+      paymentStatus: data.order.payment_status,
+      ...(itemStatuses.size ? { items: previous.items.map((item) => ({ ...item, status: itemStatuses.get(item.productId) || item.status })) } : {}),
+      ...(user.role === 'customer' || status === 'cancelled' ? { items: previous.items.map((item) => ({ ...item, status: 'cancelled' })) } : {}),
+    }));
+    (data.products || []).forEach((product) => {
+      db.updateLocal('products', product.id, { stock: product.stock, sold: product.sold });
+    });
+    if (user.role === 'vendor' && data.vendor_balance != null && Number.isFinite(Number(data.vendor_balance))) {
+      db.updateLocal('vendors', user.vendorId, { balance: Number(data.vendor_balance) });
+    }
+    (data.vendor_balances || []).forEach((vendor) => {
+      db.updateLocal('vendors', vendor.id, { balance: Number(vendor.balance) });
+    });
+  } else {
+    const previous = db.get('orders', id);
+    if (!previous) throw new Error('Order not found.');
+    const patch = {
+      status,
+      paymentStatus: status === 'cancelled' ? (previous.paymentStatus === 'paid' ? 'refunded' : 'unpaid') : status === 'delivered' ? 'paid' : previous.paymentStatus,
+    };
+    order = isLiveAccount
+      ? await db.updateAndSync('orders', id, patch)
+      : db.updateLocal('orders', id, patch);
+  }
+  if (!order) throw new Error('Order not found.');
   channel('orders').send('order:update', order, { remote: false });
   return respond(order);
 }

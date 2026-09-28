@@ -7,7 +7,18 @@ import { registerSW } from '../../core/pwa.js';
 /** Split-screen auth layout. Returns the form container. */
 export function mountAuth(sideTitle = 'Watch. Shop. Live.') {
   registerSW();
-  const posters = db.where('reels', (r) => r.status === 'approved').slice(0, 3).map((r) => r.poster);
+
+  const seededPosters = [
+    'https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s8/1.webp',
+    'https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/1.webp',
+    'https://cdn.dummyjson.com/product-images/beauty/red-lipstick/1.webp',
+  ];
+
+  const posters = Array.from(new Set([
+    ...db.where('reels', (r) => r.status === 'approved').map((r) => r.poster).filter(Boolean),
+    ...seededPosters,
+  ])).slice(0, 3);
+
   document.getElementById('app').innerHTML = `
   <div class="auth">
     <aside class="auth-side">

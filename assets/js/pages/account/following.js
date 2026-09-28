@@ -16,7 +16,10 @@ async function render() {
       const live = db.where('streams', (s) => s.vendorId === v.id && s.status === 'live').length;
       return `<div class="stack" style="gap:8px">${vendorCard(v)}<div class="row">${live ? `<a class="btn btn-live btn-sm grow" href="${routes.live()}">LIVE now</a>` : ''}<button class="btn btn-outline btn-sm grow" data-unfollow="${v.id}">Unfollow</button></div></div>`;
     }).join('')}</div>` : emptyState('users', "You're not following any stores", 'Follow stores to see their new reels and get notified when they go live.', `<a class="btn btn-primary" href="${routes.home()}">Explore stores</a>`)}`;
-  $$('[data-unfollow]').forEach((b) => (b.onclick = () => { toggleFollow(b.dataset.unfollow); toast('Unfollowed', 'info'); render(); }));
+  $$('[data-unfollow]').forEach((b) => (b.onclick = async () => {
+    try { await toggleFollow(b.dataset.unfollow); toast('Unfollowed', 'info'); render(); }
+    catch (error) { toast(error.message, 'error'); }
+  }));
 }
 
 if (el) {

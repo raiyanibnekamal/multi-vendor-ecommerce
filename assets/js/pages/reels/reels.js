@@ -81,9 +81,11 @@ async function openComments(reelId, section) {
     $('[data-cform]', m.body).onsubmit = async (e) => {
       e.preventDefault();
       if (!(await ensureLogin('Sign in to comment'))) return;
-      await addComment(reelId, e.target.text.value.trim());
-      refreshCounts(section);
-      render();
+      try {
+        await addComment(reelId, e.target.text.value.trim());
+        refreshCounts(section);
+        render();
+      } catch (error) { toast(error.message, 'error'); }
     };
   };
   render();
@@ -132,7 +134,10 @@ function bindReel(section) {
     if (now - lastTap < 300) {
       const rect = stage.getBoundingClientRect();
       heartBurst(stage, e.clientX - rect.left, e.clientY - rect.top);
-      if (!isLiked(r.id) && (await ensureLogin('Sign in to like reels'))) { toggleLike(r.id); track('like', { productId: r.productIds[0] }); setLiked(section, true); }
+      if (!isLiked(r.id) && (await ensureLogin('Sign in to like reels'))) {
+        try { await toggleLike(r.id); track('like', { productId: r.productIds[0] }); setLiked(section, true); }
+        catch (error) { toast(error.message, 'error'); }
+      }
       lastTap = 0;
       return;
     }
@@ -151,23 +156,27 @@ function bindReel(section) {
   };
   $('[data-like]', section).onclick = async () => {
     if (!(await ensureLogin('Sign in to like reels'))) return;
-    const now = toggleLike(r.id);
-    if (now) track('like', { productId: r.productIds[0] });
-    setLiked(section, now);
+    try {
+      const now = await toggleLike(r.id);
+      if (now) track('like', { productId: r.productIds[0] });
+      setLiked(section, now);
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-save]', section).onclick = async (e) => {
     const btn = e.currentTarget;
     if (!(await ensureLogin('Sign in to save reels'))) return;
-    const now = toggleSave(r.id);
-    btn.classList.toggle('saved', now);
-    refreshCounts(section);
-    toast(now ? 'Saved to your collection' : 'Removed from saved', now ? 'success' : 'info', now ? { action: 'View', href: routes.saved() } : {});
+    try {
+      const now = await toggleSave(r.id);
+      btn.classList.toggle('saved', now);
+      refreshCounts(section);
+      toast(now ? 'Saved to your collection' : 'Removed from saved', now ? 'success' : 'info', now ? { action: 'View', href: routes.saved() } : {});
+    } catch (error) { toast(error.message, 'error'); }
   };
   $('[data-share]', section).onclick = async () => {
     const link = new URL(routes.reels(r.id), location.href).href;
     if (navigator.share) navigator.share({ title: 'StreamCart reel', text: r.caption, url: link }).catch(() => {});
     else await navigator.clipboard?.writeText(link).catch(() => {});
-    recordShare(r.id);
+    await recordShare(r.id);
     refreshCounts(section);
     toast('Reel link copied — share it anywhere!', 'info');
   };
@@ -176,8 +185,10 @@ function bindReel(section) {
   $$('[data-buy]', section).forEach((b) => (b.onclick = () => { video.pause(); openQuickBuy(b.dataset.buy, { source: 'reel' }); }));
   $('[data-follow]', section).onclick = async (e) => {
     if (!(await ensureLogin('Sign in to follow stores'))) return;
-    const now = toggleFollow(e.currentTarget.dataset.follow);
-    $$(`[data-follow="${r.vendorId}"]`).forEach((b) => { b.classList.toggle('on', now); b.textContent = now ? 'Following' : 'Follow'; });
+    try {
+      const now = await toggleFollow(e.currentTarget.dataset.follow);
+      $$(`[data-follow="${r.vendorId}"]`).forEach((b) => { b.classList.toggle('on', now); b.textContent = now ? 'Following' : 'Follow'; });
+    } catch (error) { toast(error.message, 'error'); }
   };
 }
 

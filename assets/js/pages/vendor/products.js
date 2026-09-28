@@ -52,14 +52,18 @@ function table() {
         </tr>`).join('')}</tbody>
     </table></div>` : emptyState('package', 'No products match', 'Try a different search or add a new product.');
   $$('[data-toggle]').forEach((t) => (t.onchange = async () => {
-    await saveProduct({ id: t.dataset.toggle, status: t.checked ? 'active' : 'draft' });
-    toast(t.checked ? 'Product is now live' : 'Product hidden from store', 'info');
+    try {
+      await saveProduct({ id: t.dataset.toggle, status: t.checked ? 'active' : 'draft' });
+      toast(t.checked ? 'Product is now live' : 'Product hidden from store', 'info');
+    } catch (error) { t.checked = !t.checked; toast(error.message, 'error'); }
   }));
   $$('[data-del]').forEach((b) => (b.onclick = async () => {
     if (!(await confirmDialog({ title: 'Delete product?', message: 'This removes it from your store and any reels it is tagged in.', confirmText: 'Delete', danger: true }))) return;
-    await deleteProduct(b.dataset.del);
-    toast('Product deleted', 'info');
-    table();
+    try {
+      await deleteProduct(b.dataset.del);
+      toast('Product deleted', 'info');
+      table();
+    } catch (error) { toast(error.message, 'error'); }
   }));
 }
 
