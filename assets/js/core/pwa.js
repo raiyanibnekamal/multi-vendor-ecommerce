@@ -13,7 +13,7 @@ export function registerSW() {
     await Promise.all(registrations.map((registration) => registration.unregister()));
   }).then(() => {
     const root = document.body?.dataset?.root || './';
-    const swUrl = root.endsWith('/') ? `${root}sw.js` : `${root}/sw.js`;
+    const swUrl = root.endsWith('/') ? `${root}sw.js?v=20260928-10` : `${root}/sw.js?v=20260928-10`;
     return navigator.serviceWorker.register(swUrl, { scope: root || './' });
   }).catch((err) => {
     console.warn('[StreamCart PWA] Service Worker registration failed:', err);

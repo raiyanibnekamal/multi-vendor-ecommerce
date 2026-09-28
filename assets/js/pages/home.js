@@ -1,5 +1,5 @@
 import { mountShell } from '../components/shell.js';
-import { productCard, reelThumb, liveCard, vendorCard, skeletonHome, priceHtml } from '../components/cards.js?v=20260928-5';
+import { productCard, reelThumb, liveCard, vendorCard, skeletonHome, priceHtml } from '../components/cards.js?v=20260928-7';
 import { toast } from '../components/toast.js';
 import { routes } from '../core/routes.js';
 import { escapeHtml, icon, formatPrice, formatNumber, stars, avatar, digits, t, safeMediaUrl } from '../core/utils.js';
