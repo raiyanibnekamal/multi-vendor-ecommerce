@@ -9,7 +9,7 @@
 
 ## 📊 1. Codebase Overview & Current Status
 
-> **Status snapshot (2026-09-28):** The application is in a stable frontend prototype phase with a fully featured storefront, login flows, vendor/admin dashboards, reels discovery, live shopping, AI-assisted discovery, and a working local/demo data model. The remaining work is primarily production hardening: provider-backed payments, payout transfer execution, and verifying the remote Supabase migration state on the hosted project.
+> **Status snapshot (2026-09-28):** The application is in a stable frontend prototype / pre-production phase with a fully featured storefront, login flows, vendor/admin dashboards, reels discovery, live shopping, AI-assisted discovery, and a working local/demo data model. Security source hardening is implemented; remaining launch blockers are hosted migration verification, distributed rate limiting, provider-backed payments, payout transfer execution, and real live-video transport.
 
 - **Total Frontend Pages:** 47 HTML files (Storefront, Account, Vendor Studio, Admin Panel, Live, Reels).
 - **JavaScript Inventory:** 93 source JS files: 91 browser modules under `assets/js`, `api/ai.js`, and `sw.js` — **0 syntax errors** in the source-only parser check.
@@ -64,6 +64,20 @@
 ### Priority 9: Vendor Sensitive-Field Authorization
 - **Status: Source migration implemented; remote application pending verification.** Migration 08 protects vendor ownership, approval, verification, rating, followers, commission, and balance fields; it also prevents self-service profile role/status escalation, restricts public profile reads, scopes Storage uploads to vendor folders, and moves follow counters behind a server RPC.
 
+### Priority 10: Production Security Hardening
+- **Status: Source complete; hosted migration pending.** Migration 10 revokes unintended public RPC execution, constrains direct stream-message inserts, adds message-length enforcement and high-volume lookup indexes, and documents the SQL injection boundary. `vercel.json` adds CSP, HSTS, frame protection, MIME protection, referrer policy, and Permissions Policy. Unsafe media schemes are rejected and dynamic media attributes are escaped. Supabase signup without an authenticated session no longer creates a fake local production session.
+
+### Priority 11: Order payment and notification foundation
+- **Status: Secure mock mode complete; real provider pending.** Checkout supports COD, card, bKash, and Nagad demo payment paths without storing payment credentials. Migration 11 adds payment metadata, an authenticated mock-payment wrapper, customer/vendor/admin order notifications, notification RLS, and Realtime publication. Customers can download or print an order slip after placement. Replace the mock wrapper with a signed provider webhook before accepting real money.
+
+### Security threat coverage
+- **SQL injection:** No user-controlled dynamic SQL path was found. Database writes use Supabase query builders or fixed-parameter RPCs; migration cleanup uses identifier quoting only.
+- **XSS:** Dynamic media schemes are allowlisted and media URLs are escaped before HTML attributes. Display text continues through `escapeHtml`; new render boundaries should preserve that rule.
+- **Auth/session abuse:** Live accounts require a real Supabase session. Demo/local sessions remain isolated to mock mode, and server-side RLS/RPC authorization remains authoritative.
+- **DoS/resource exhaustion:** Upload MIME/size allowlists, API request-size limits, per-IP AI rate limits, per-instance AI concurrency caps, database message length checks, and indexed high-volume lookups are in place.
+- **CSRF/data exposure:** Supabase bearer requests are used instead of application cookies; RLS scopes private rows. Verify hosted RLS state and avoid adding cookie-authenticated mutation endpoints without CSRF protection.
+- **Remaining operational controls:** Distributed rate limiting, WAF/bot protection, dependency scanning, Supabase Auth email/redirect configuration, backup/restore drills, payment-webhook verification, and live-video provider security still require deployment/provider setup.
+
 ---
 
 ## 📋 3. Implementation Checklist
@@ -100,9 +114,15 @@
   - [x] Add protected vendor fulfillment, customer/admin cancellation, payout, follow, and dispute RPCs.
   - [x] Restrict authenticated profile/vendor fields and media uploads by owner.
 
+- [x] **Task 9: Production Security Hardening**
+  - [x] Remove the live-auth local-session fallback for unconfirmed Supabase accounts.
+  - [x] Add defense-in-depth RPC privilege revocation and stream-message constraints in migration 10.
+  - [x] Reject unsafe media schemes and escape dynamic media attributes.
+  - [x] Add Vercel security headers and update the deployment runbook.
+
 ## Verification & Operational Notes
 
 - Verified on 2026-09-28: 93 source JavaScript files parse successfully; all 91 browser modules have resolvable relative imports; all 47 project HTML pages have no missing local `src`/`href` targets; `git diff --check` passes. The deployed homepage URL opened, but customer/vendor/admin workflows were not exhaustively browser-tested. No package manifest or automated test suite is present in the repository.
-- The remote Supabase project was not mutated as part of this workspace check, and its applied migration state was not independently verified. The migration 08 script executed in an isolated PGlite PostgreSQL instance. Smoke tests passed for role/vendor protection, server-derived pricing, COD-only enforcement, atomic inventory/order changes, delivery credit, payout reserve/refund, customer/admin cancellation restock, confirmation-safe vendor onboarding, follow counters, vendor-scoped uploads, and dispute resolution without marking a refund paid.
+- The remote Supabase project was not mutated as part of this workspace check, and its applied migration state was not independently verified. Apply migrations 01 through 11 in order; migrations 10 and 11 should be applied and reviewed in the hosted Supabase SQL editor before launch.
 - Runtime behaviors represented in source include guarded network-first service-worker caching, local media fallbacks, Supabase Auth for non-demo accounts, and realtime subscriptions with same-browser fallbacks. Apply migration 08 to the remote Supabase project before using the updated live checkout, order status, dispute, follow, storage-upload, or payout code; no production credentials or database state were inspected.
 - Guest checkout is not implemented; order creation is intentionally authenticated to match the current checkout UI and avoid public unrestricted writes.

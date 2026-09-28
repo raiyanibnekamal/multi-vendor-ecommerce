@@ -20,6 +20,9 @@ The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://mult
 | [`migrations/06_auth_order_hardening.sql`](migrations/06_auth_order_hardening.sql) | Signup role restrictions, customer-owned order inserts, and seeded vendor ownership backfill. |
 | [`migrations/07_rls_recursion_fix.sql`](migrations/07_rls_recursion_fix.sql) | Replaces order policies and makes policy helpers RLS-independent to prevent `42P17` recursion. |
 | [`migrations/08_backend_security_and_atomic_flows.sql`](migrations/08_backend_security_and_atomic_flows.sql) | Protects profile/vendor fields and adds atomic order, fulfillment, cancellation, payout, follow, dispute, and vendor-scoped Storage operations. |
+| [`migrations/09_user_data_and_social_persistence.sql`](migrations/09_user_data_and_social_persistence.sql) | Adds authenticated cart, wishlist, reel, stream, conversation, and review RPCs. |
+| [`migrations/10_production_security_hardening.sql`](migrations/10_production_security_hardening.sql) | Revokes unintended public RPC execution, constrains direct stream-message writes, adds length checks/indexes, and completes the production security boundary. |
+| [`migrations/11_order_payments_notifications.sql`](migrations/11_order_payments_notifications.sql) | Adds secure mock-payment metadata/wrapper, notification storage/RLS, order notification triggers, and Realtime publication. |
 
 ---
 
@@ -37,7 +40,7 @@ The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://mult
 3. Copy the entire contents of [`supabase/setup.sql`](setup.sql) and paste it into the editor.
 4. Click **Run** (Ctrl + Enter).
    > This all-in-one script is for a fresh project. Do not rerun it over an existing database; use the ordered migrations instead.
-5. Before seeding or connecting the app, run migrations `06_auth_order_hardening.sql`, `07_rls_recursion_fix.sql`, and `08_backend_security_and_atomic_flows.sql` in order. The all-in-one setup script contains the base schema and policies but not these forward hardening migrations.
+5. Before seeding or connecting the app, run migrations `06_auth_order_hardening.sql`, `07_rls_recursion_fix.sql`, `08_backend_security_and_atomic_flows.sql`, `09_user_data_and_social_persistence.sql`, `10_production_security_hardening.sql`, and `11_order_payments_notifications.sql` in order. The all-in-one setup script contains the base schema and policies but not these forward hardening migrations.
 
 ### Step 3: Populate Demo Seed Data
 1. In the **SQL Editor**, open a new tab.
@@ -69,7 +72,7 @@ The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://mult
 
 ## Existing project migrations
 
-For an existing database, apply migrations 01 through 08 in order. The app does not run SQL migrations automatically. Migration 08 must be applied before the current frontend registration, checkout, order status, follow, storage upload, dispute, and payout flows can use the secured policies/RPCs.
+For an existing database, apply migrations 01 through 11 in order. The app does not run SQL migrations automatically. Migrations 10 and 11 must be applied before production traffic; migration 11 provides secure mock payment and persisted order notifications. Do not accept real money until the mock wrapper is replaced by a signed provider integration.
 
 Migration 08 hardens `place_order_atomic`: it derives price, totals, coupon, and shipping from server-side records, locks inventory, and writes the order and items in one transaction. Live checkout currently supports COD only. Do not enable online payments until a trusted payment integration and verified webhook are deployed.
 

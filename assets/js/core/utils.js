@@ -53,7 +53,11 @@ export function fallbackMediaUrl(label = 'Image', { width = 900, height = 900, b
 }
 
 export function safeMediaUrl(url, fallbackLabel = 'Image', fallbackColors) {
-  if (typeof url === 'string' && url.trim()) return url;
+  if (typeof url === 'string') {
+    const candidate = url.trim();
+    const isRelative = (candidate.startsWith('/') && !candidate.startsWith('//')) || candidate.startsWith('./') || candidate.startsWith('../');
+    if (isRelative || /^(https?:\/\/|data:image\/|blob:)/i.test(candidate)) return candidate;
+  }
   return fallbackMediaUrl(fallbackLabel, fallbackColors);
 }
 

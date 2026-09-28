@@ -8,6 +8,7 @@ import { vendorOrdersSync } from '../services/orders.js';
 import { logoHtml } from './header.js';
 import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
+import { toast } from './toast.js';
 
 function vendorNav(vendor) {
   const vendorId = vendor?.id ?? null;
@@ -63,7 +64,8 @@ function adminNav() {
 export function mountDashboard({ role, active, title }) {
   registerSW();
   channel('products');
-  channel('orders');
+  const orderChannel = channel('orders');
+  const notificationChannel = channel('notifications');
   const user = requireRole(role);
   if (!user) return null;
   const vendor = role === 'vendor' ? currentVendor() : null;
@@ -94,7 +96,7 @@ export function mountDashboard({ role, active, title }) {
         <div class="right">
           ${langToggleHtml('btn btn-ghost btn-icon')}
           ${themeToggleHtml('btn btn-ghost btn-icon')}
-          <button class="btn btn-ghost btn-icon" title="${t('Notifications')}">${icon('bell')}</button>
+          <button class="btn btn-ghost btn-icon" data-notifications title="${t('Notifications')}">${icon('bell')}</button>
           ${avatar(user.name, { size: 'sm' })}
           <div class="hide-sm"><div class="small bold">${escapeHtml(user.name)}</div><div class="xs muted">${user.email}</div></div>
         </div>
@@ -106,6 +108,19 @@ export function mountDashboard({ role, active, title }) {
     </div>
   </div>`;
   app.querySelector('[data-logout]').onclick = (e) => { e.preventDefault(); logout(); };
+  const notificationButton = app.querySelector('[data-notifications]');
+  const showOrderNotice = (order) => {
+    if (role === 'admin' || (role === 'vendor' && vendor && order.items?.some((item) => item.vendorId === vendor.id))) {
+      notificationButton.classList.add('active');
+      toast(role === 'vendor' ? 'A new order includes your product.' : 'A new order was placed.', 'info');
+    }
+  };
+  orderChannel.on('order:new', showOrderNotice);
+  notificationChannel.on('notifications:insert', (notification) => {
+    notificationButton.classList.add('active');
+    notificationButton.title = notification.title || t('Notifications');
+    toast(notification.title || 'New notification', 'info');
+  });
   const side = app.querySelector('[data-side]');
   app.querySelector('[data-toggle]').onclick = (e) => { e.stopPropagation(); side.classList.toggle('open'); };
   document.addEventListener('click', (e) => { if (!e.target.closest('[data-side]')) side.classList.remove('open'); });

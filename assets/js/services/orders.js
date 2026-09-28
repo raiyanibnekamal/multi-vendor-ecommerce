@@ -5,9 +5,9 @@ import { CONFIG } from '../core/config.js';
 import { getSupabase } from '../core/supabase.js';
 
 export const PAYMENT_METHODS = [
-  { id: 'card', name: 'Credit / Debit Card', note: 'Visa, Mastercard, Amex — secured by Stripe', icon: 'credit-card' },
-  { id: 'bkash', name: 'bKash', note: 'Pay with your bKash wallet', icon: 'smartphone' },
-  { id: 'nagad', name: 'Nagad', note: 'Pay with your Nagad wallet', icon: 'smartphone' },
+  { id: 'card', name: 'Credit / Debit Card', note: 'Secure demo payment — no real charge', icon: 'credit-card' },
+  { id: 'bkash', name: 'bKash', note: 'Secure demo wallet payment', icon: 'smartphone' },
+  { id: 'nagad', name: 'Nagad', note: 'Secure demo wallet payment', icon: 'smartphone' },
   { id: 'cod', name: 'Cash on Delivery', note: 'Pay when you receive the order', icon: 'banknote' },
 ];
 
@@ -25,7 +25,7 @@ export const COUPONS = {
 export async function placeOrder({ lines, address, paymentMethod, source = 'store', coupon = null }) {
   const user = currentUser();
   if (!user) throw new Error('Please sign in to place an order.');
-  if (paymentMethod !== 'cod') throw new Error('Online payments are not available yet. Please choose Cash on Delivery.');
+  if (!PAYMENT_METHODS.some((method) => method.id === paymentMethod)) throw new Error('Choose a valid payment method.');
   const items = lines.map(({ productId, qty }) => {
     const p = db.get('products', productId);
     if (!p || p.stock < qty) throw new Error(`${p?.title || 'A product'} doesn't have enough stock.`);
@@ -46,7 +46,9 @@ export async function placeOrder({ lines, address, paymentMethod, source = 'stor
     total: subtotal + shipping - discount,
     status: 'pending',
     paymentMethod,
-    paymentStatus: 'unpaid',
+    paymentStatus: paymentMethod === 'cod' ? 'unpaid' : 'paid',
+    paymentProvider: paymentMethod === 'cod' ? 'cod' : 'mock',
+    paymentReference: paymentMethod === 'cod' ? null : `MOCK-${Date.now().toString(36).toUpperCase()}`,
     source,
     address,
     createdAt: new Date().toISOString(),

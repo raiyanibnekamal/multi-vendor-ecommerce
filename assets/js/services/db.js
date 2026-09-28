@@ -134,6 +134,7 @@ async function syncFromSupabase() {
     orders: 'orders',
     payouts: 'payouts',
     disputes: 'disputes',
+    notifications: 'notifications',
   };
 
   for (const [appTable, pgTable] of Object.entries(tableMap)) {
@@ -147,6 +148,10 @@ async function syncFromSupabase() {
             ? supabase.from('live_streams').select('*, productIds:stream_products(product_id)').limit(200)
             : appTable === 'conversations'
               ? supabase.from('conversations').select('*, messages(*)').limit(200)
+              : appTable === 'notifications'
+                ? hasSupabaseSession
+                  ? supabase.from(pgTable).select('*').eq('recipient_id', authData.session.user.id).order('created_at', { ascending: false }).limit(200)
+                  : Promise.resolve({ data: [], error: null })
               : appTable === 'cartItems' || appTable === 'wishlistItems' || appTable === 'reelLikes' || appTable === 'reelSaves'
                 ? hasSupabaseSession
                   ? supabase.from(pgTable).select('*').eq('user_id', authData.session.user.id).limit(500)
@@ -322,7 +327,8 @@ export const db = {
       throw new Error('Sign in again before placing this order.');
     }
 
-    const { data, error } = await supabase.rpc('place_order_atomic', {
+    const rpcName = order.paymentMethod === 'cod' ? 'place_order_atomic' : 'place_order_mock_payment';
+    const { data, error } = await supabase.rpc(rpcName, {
       p_order_id: order.id,
       p_items: order.items.map(({ productId, qty }) => ({ productId, qty })),
       p_address: order.address,
@@ -514,7 +520,7 @@ export const db = {
       getSupabase().then((supabase) => {
         if (!supabase) return;
         const pgTable = POSTGRES_TABLES[table] || table;
-        supabase.from(pgTable).delete().eq('id', id).catch((err) => {
+        Promise.resolve(supabase.from(pgTable).delete().eq('id', id)).catch((err) => {
           console.warn(`[StreamCart] Supabase delete failed for ${table}:`, err);
         });
       });

@@ -5,6 +5,7 @@ import { bindCardActions } from './cards.js';
 import { mountChatWidget } from './chatWidget.js';
 import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
+import { toast } from './toast.js';
 
 /**
  * Mounts the storefront layout (header, footer, mobile nav, AI chat) into #app
@@ -14,6 +15,9 @@ export function mountShell({ active = '', footer = true, chat = true, bottomNav 
   registerSW();
   channel('products');
   channel('orders');
+  channel('notifications').on('notifications:insert', (notification) => {
+    toast(notification.title || 'Order update', 'info');
+  });
   const app = document.getElementById('app');
   app.innerHTML = `<div data-header></div><main id="main"></main>${footer ? '<div data-footer></div>' : ''}${bottomNav ? '<nav class="bottom-nav" data-bottom-nav></nav>' : ''}`;
   const headerEl = app.querySelector('[data-header]');

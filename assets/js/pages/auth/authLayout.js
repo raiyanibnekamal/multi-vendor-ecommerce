@@ -1,4 +1,4 @@
-import { icon, initIcons } from '../../core/utils.js';
+import { icon, initIcons, escapeHtml, safeMediaUrl } from '../../core/utils.js';
 import { routes } from '../../core/routes.js';
 import { logoHtml } from '../../components/header.js';
 import { db } from '../../services/db.js';
@@ -31,7 +31,7 @@ export function mountAuth(sideTitle = 'Watch. Shop. Live.') {
           <li><span class="ic">${icon('sparkles')}</span> AI recommendations made for you</li>
           <li><span class="ic">${icon('shield-check')}</span> Secure checkout with card, bKash & COD</li>
         </ul>
-        <div class="auth-reels">${posters.map((p) => `<img src="${p}" alt="">`).join('')}</div>
+        <div class="auth-reels">${posters.map((p) => `<img src="${escapeHtml(safeMediaUrl(p, 'Reel preview'))}" alt="">`).join('')}</div>
       </div>
       <span class="small" style="opacity:.75">Frontend prototype. Accounts and data are mocked in your browser.</span>
     </aside>

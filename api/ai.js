@@ -2,7 +2,9 @@ const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 const MAX_BODY_BYTES = 16 * 1024;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 30;
+const MAX_ACTIVE_REQUESTS = 8;
 const requestsByIp = new Map();
+let activeRequests = 0;
 
 const ACTIONS = {
   'support-chat': {
@@ -43,6 +45,9 @@ const ACTIONS = {
 };
 
 function send(res, status, payload) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
   res.status(status).json(payload);
 }
 
@@ -106,6 +111,7 @@ module.exports = async function handler(req, res) {
   }
   const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   if (!takeRateLimit(ip)) return send(res, 429, { error: 'Too many AI requests. Please wait a minute and try again.' });
+  if (activeRequests >= MAX_ACTIVE_REQUESTS) return send(res, 429, { error: 'AI service is busy. Please try again shortly.' });
   if (!process.env.GROQ_API_KEY) return send(res, 200, { available: false, reason: 'not_configured' });
 
   let body = req.body;
@@ -129,6 +135,7 @@ module.exports = async function handler(req, res) {
   const input = body.input;
   const definition = ACTIONS[action];
   if (!definition || !validInput(action, input)) return send(res, 400, { error: 'Unsupported AI action or invalid input.' });
+  activeRequests += 1;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -161,5 +168,7 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     console.error('[AI proxy] Request failed:', error.message);
     return send(res, 502, { error: 'AI service is temporarily unavailable.' });
+  } finally {
+    activeRequests = Math.max(0, activeRequests - 1);
   }
 };

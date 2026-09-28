@@ -48,7 +48,7 @@ docs/ARCHITECTURE.md
 
 `services/db.js` exposes `all / get / where / insert / update / remove`. It initializes from seed data/localStorage and asynchronously hydrates configured tables from Supabase, including clearing stale demo rows when a live query succeeds with no rows. Supabase Auth is used for non-demo accounts; seeded demo accounts remain local. With migrations through 08 applied, live checkout requires the matching authenticated Supabase UUID and calls `place_order_atomic`; the database derives prices, totals, and stock changes in one transaction. Demo orders remain local.
 
-The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Apply migrations through `08_backend_security_and_atomic_flows.sql` to existing databases before relying on live registration, order, follow, storage, dispute, or payout workflows.
+The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Apply migrations through `11_order_payments_notifications.sql` to existing databases before relying on live registration, order, notification, follow, storage, dispute, payout, or stream-message workflows.
 
 ### 3.1 Tables (Postgres)
 
@@ -150,7 +150,7 @@ The browser calls only the same-origin `/api/ai` endpoint. When configured, `GRO
 
 ## 7. Backend readiness and deployment notes
 
-The following diagrams and tables describe the backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order through `08_backend_security_and_atomic_flows.sql`; the frontend does not run database migrations automatically.
+The following diagrams and tables describe the backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order through `10_production_security_hardening.sql`; the frontend does not run database migrations automatically.
 
 ### 7.1 Architecture & Component Map
 
@@ -226,7 +226,15 @@ The following diagrams and tables describe the backend boundary, not a claim tha
 
 This matrix summarizes source and migration intent, not a live database attestation. Confirm migration 08 is applied before enabling live registration, checkout, order, follow, Storage, dispute, or payout workflows.
 
-### 7.4 Implementation Roadmap
+### 7.4 Security posture
+
+- **Authentication:** Supabase Auth is the production identity boundary. An account without a Supabase session is not treated as authenticated; local sessions are limited to explicit demo/mock mode.
+- **Authorization:** RLS and security-definer RPCs enforce customer, vendor, and admin boundaries. Client-side role guards are UX only.
+- **Injection:** Application SQL uses Supabase query builders and fixed-parameter RPCs. The only dynamic SQL in migrations uses `format('%I', ...)` for catalog identifiers, never user input.
+- **Browser boundary:** Media URLs are restricted to safe schemes and escaped before HTML attribute insertion. Vercel headers add CSP, HSTS, frame protection, MIME protection, referrer policy, and Permissions Policy.
+- **Launch dependencies:** Verify migrations 01-11 on the hosted database, configure Supabase Auth email policy, add distributed API rate limiting, and replace the mock-payment wrapper with a trusted payment webhook before handling real money.
+
+### 7.5 Implementation Roadmap
 
 - [x] **Phase 1: Architecture & Design Alignment** (this document)
 - [x] **Phase 2: Database Schema & DDL Scripts** (`supabase/migrations/01_schema.sql`)
@@ -237,4 +245,6 @@ This matrix summarizes source and migration intent, not a live database attestat
 - [x] **Phase 7: Comprehensive Demo Seed Data** (`supabase/seed.sql`)
 - [x] **Phase 8: Frontend Client Integration** (`assets/js/core/supabase.js` & service bridge)
 - [x] **Phase 9: Supabase Auth, Storage, Realtime and Groq AI proxy integration** (source implemented; production env/migrations still require deployment configuration)
+- [x] **Phase 10: Production security hardening** (`10_production_security_hardening.sql`, safe media URL handling, and deployment security headers; hosted migration state still requires verification)
+- [x] **Phase 11: Order payment and notification foundation** (`11_order_payments_notifications.sql`, secure mock payment wrapper, persisted notifications, realtime updates, and downloadable order receipts)
 

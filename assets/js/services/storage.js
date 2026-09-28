@@ -4,6 +4,11 @@ import { getSupabase } from '../core/supabase.js';
 
 const LOCAL_MEDIA_DB = 'streamcart-media';
 const LOCAL_MEDIA_STORE = 'files';
+const UPLOAD_LIMITS = {
+  'product-images': { maxBytes: 5 * 1024 * 1024, types: new Set(['image/jpeg', 'image/png', 'image/webp']) },
+  reels: { maxBytes: 50 * 1024 * 1024, types: new Set(['video/mp4', 'video/webm', 'video/quicktime', 'image/jpeg', 'image/webp']) },
+  avatars: { maxBytes: 2 * 1024 * 1024, types: new Set(['image/jpeg', 'image/png', 'image/webp']) },
+};
 const resolvedMedia = new Map();
 let localMediaDb;
 
@@ -56,6 +61,11 @@ export async function resolveMediaUrl(url) {
  */
 export async function uploadFile(bucket, file, customName) {
   if (!file) return null;
+  const limits = UPLOAD_LIMITS[bucket];
+  if (!limits) throw new Error('Unsupported upload destination.');
+  if (!limits.types.has(file.type) || file.size > limits.maxBytes) {
+    throw new Error(`Invalid ${bucket} file. Check the file type and size limit.`);
+  }
 
   const safeName = file.name?.replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
   const fileName = customName

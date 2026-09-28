@@ -21,7 +21,7 @@ function productCardHtml(pid) {
   if (!p) return '';
   return `
     <div class="reel-product">
-      <img src="${p.thumbnail}" alt="">
+      <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="">
       <div class="grow" style="min-width:0">
         <div class="t truncate">${escapeHtml(p.title)}</div>
         <div class="p">${formatPrice(p.price)}${p.originalPrice > p.price ? `<s>${formatPrice(p.originalPrice)}</s>` : ''}</div>
@@ -40,7 +40,7 @@ function reelHtml(r) {
   <section class="reel" data-reel="${r.id}">
     <div class="reel-stage">
       <div class="reel-progress"></div>
-      <video ${videoUrl ? `src="${videoUrl}"` : ''} poster="${poster}" loop playsinline muted preload="metadata" onerror="this.poster='${poster}'"></video>
+      <video ${videoUrl ? `src="${escapeHtml(videoUrl)}"` : ''} poster="${escapeHtml(poster)}" loop playsinline muted preload="metadata" onerror="this.poster='${escapeHtml(poster)}'"></video>
       <div class="reel-top">
         <span class="badge" style="background:rgba(0,0,0,.4);color:#fff">${icon('eye')} ${formatNumber(r.views)}</span>
         <button class="glass" data-mute aria-label="Toggle sound">${icon(muted ? 'volume-x' : 'volume-2')}</button>
@@ -100,7 +100,7 @@ function openShopList(r) {
     variant: 'sheet',
     content: `<div class="stack">${r.productIds.map((pid) => {
       const p = db.get('products', pid);
-      return p ? `<div class="row" style="gap:12px"><img src="${p.thumbnail}" style="width:56px;height:56px;border-radius:10px;background:var(--surface-2);object-fit:contain"><div class="grow"><div class="small bold clamp-2">${escapeHtml(p.title)}</div><b class="text-primary">${formatPrice(p.price)}</b></div><button class="btn btn-primary btn-sm" data-pick="${p.id}">Buy</button></div>` : '';
+      return p ? `<div class="row" style="gap:12px"><img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" style="width:56px;height:56px;border-radius:10px;background:var(--surface-2);object-fit:contain"><div class="grow"><div class="small bold clamp-2">${escapeHtml(p.title)}</div><b class="text-primary">${formatPrice(p.price)}</b></div><button class="btn btn-primary btn-sm" data-pick="${escapeHtml(p.id)}">Buy</button></div>` : '';
     }).join('')}</div>`,
   });
   $$('[data-pick]', m.body).forEach((b) => (b.onclick = () => { m.close(); openQuickBuy(b.dataset.pick, { source: 'reel' }); }));

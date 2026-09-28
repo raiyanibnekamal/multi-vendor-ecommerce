@@ -2,9 +2,10 @@ import { mountShell } from '../../components/shell.js';
 import { productCard, emptyState } from '../../components/cards.js';
 import { routes } from '../../core/routes.js';
 import { requireRole } from '../../core/auth.js';
-import { escapeHtml, icon, qs, formatPrice, formatDate } from '../../core/utils.js';
+import { escapeHtml, icon, qs, $, formatPrice, formatDate } from '../../core/utils.js';
 import { getOrder, PAYMENT_METHODS } from '../../services/orders.js';
 import { getRecommendations } from '../../services/ai.js';
+import { downloadOrderReceipt, printOrderReceipt } from '../../services/receipt.js';
 
 const user = requireRole();
 const main = mountShell({ active: 'checkout' });
@@ -30,11 +31,15 @@ async function render() {
       </div>
       <div class="row mt-3" style="justify-content:center;flex-wrap:wrap">
         <a class="btn btn-primary btn-lg" href="${routes.orderDetail(order.id)}">${icon('package')} Track order</a>
+        <button class="btn btn-outline btn-lg" data-download-receipt>${icon('download')} Download order slip</button>
+        <button class="btn btn-outline btn-lg" data-print-receipt>${icon('printer')} Print</button>
         <a class="btn btn-outline btn-lg" href="${routes.home()}">Continue shopping</a>
       </div>
     </div>
     <section class="section"><div class="section-head"><div><h2>Picked for you next <span class="badge badge-ai">${icon('sparkles')} AI</span></h2><p>${escapeHtml(recs.reason)}</p></div></div><div class="grid-products">${recs.items.map(productCard).join('')}</div></section>
   </div>`;
+  $('[data-download-receipt]').onclick = () => downloadOrderReceipt(order);
+  $('[data-print-receipt]').onclick = () => printOrderReceipt(order);
 }
 
 if (user) render();

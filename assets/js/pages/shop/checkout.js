@@ -40,14 +40,14 @@ function addressCards() {
 function paymentHtml() {
   return `
     <div class="stack" style="gap:10px">
-      ${PAYMENT_METHODS.filter((pm) => pm.id === 'cod').map((pm) => `<label class="radio-card"><input type="radio" name="pay" value="${pm.id}" checked>${icon(pm.icon)}<div class="grow"><b class="small">${tr(pm.name)}</b><div class="xs muted">${tr(pm.note)}</div></div></label>`).join('')}
+      ${PAYMENT_METHODS.map((pm) => `<label class="radio-card"><input type="radio" name="pay" value="${pm.id}" ${pay === pm.id ? 'checked' : ''}>${icon(pm.icon)}<div class="grow"><b class="small">${tr(pm.name)}</b><div class="xs muted">${tr(pm.note)}</div></div></label>`).join('')}
     </div>
     <div data-pay-extra class="mt-2">${payExtra()}</div>`;
 }
 
 function payExtra() {
   if (pay === 'card') return `
-    <div class="notice">${icon('lock')}<div>${tr('Card details go straight to Stripe Elements in production. Use any test values here.')}</div></div>
+    <div class="notice">${icon('lock')}<div>${tr('Secure demo payment. No real card data is stored or charged.')}</div></div>
     <div class="card-fields">
       <input class="input" name="card" placeholder="4242 4242 4242 4242" inputmode="numeric" maxlength="19" value="4242 4242 4242 4242">
       <input class="input" name="exp" placeholder="MM/YY" maxlength="5" value="12/28">
@@ -123,6 +123,7 @@ function bind(lines, coupon) {
       address = user.addresses.find((a) => a.id === addressId);
     }
     if (pay === 'card' && f.card.value.replace(/\s/g, '').length < 12) return toast(tr('Please enter a valid card number'), 'error');
+    if ((pay === 'bkash' || pay === 'nagad') && !/^01[3-9]\d{8}$/.test(f.wallet.value.replace(/\D/g, ''))) return toast(tr('Please enter a valid wallet number'), 'error');
     const btn = $('[data-place]');
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2px;border-color:rgba(255,255,255,.4);border-top-color:#fff"></span> ${pay === 'cod' ? tr('Placing order…') : tr('Processing payment…')}`;

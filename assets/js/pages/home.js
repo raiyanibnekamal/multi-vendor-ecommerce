@@ -41,14 +41,14 @@ function heroPhone(reel) {
   return `
     <div class="hero-visual" aria-hidden="true">
       <div class="phone">
-        <video ${reel.videoUrl ? `src="${reel.videoUrl}"` : ''} poster="${poster}" muted autoplay loop playsinline preload="metadata" onerror="this.poster='${poster}'"></video>
+        <video ${reel.videoUrl ? `src="${escapeHtml(reel.videoUrl)}"` : ''} poster="${escapeHtml(poster)}" muted autoplay loop playsinline preload="metadata" onerror="this.poster='${escapeHtml(poster)}'"></video>
         <div class="phone-ui">
           <div class="row" style="gap:8px">${avatar(v?.name || '', { size: 'sm', color: v?.color })}<b class="small">@${escapeHtml(v?.slug || '')}</b></div>
           <p class="xs clamp-2">${escapeHtml(reel.caption)}</p>
         </div>
       </div>
       ${p ? `<a class="float-card float-product" href="${routes.product(p.id)}" tabindex="-1">
-        <img src="${heroProductImage}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', p.title || 'Featured product')}'">
+        <img src="${escapeHtml(heroProductImage)}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title || 'Featured product'))}'">
         <div style="min-width:0"><div class="xs bold truncate">${escapeHtml(p.title)}</div>${priceHtml(p)}</div>
         <span class="btn btn-primary btn-xs">${t('Buy now')}</span>
       </a>` : ''}
@@ -95,14 +95,14 @@ async function render() {
       <div class="hero-side">
         ${live[0] ? `
         <a class="hero-tile" href="${routes.watch(live[0].id)}">
-          <img src="${safeMediaUrl(live[0].thumbnail, live[0].title || 'Live stream')}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', live[0].title || 'Live stream')}'">
+          <img src="${escapeHtml(safeMediaUrl(live[0].thumbnail, live[0].title || 'Live stream'))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', live[0].title || 'Live stream'))}'">
           <span class="badge badge-live" style="width:fit-content">LIVE</span>
           <h3 class="mt-1">${escapeHtml(live[0].title)}</h3>
           <span class="small" style="opacity:.85">${escapeHtml(db.get('vendors', live[0].vendorId)?.name || '')} · ${t('Tap to join')}</span>
         </a>` : ''}
         ${heroDeal ? `
         <a class="hero-tile light" href="${routes.products({ onSale: 1, sort: 'discount' })}">
-          <img src="${safeMediaUrl(heroDeal.thumbnail, heroDeal.title || 'Flash deal')}" alt="" onerror="this.onerror=null;this.src='${safeMediaUrl('', heroDeal.title || 'Flash deal')}'">
+          <img src="${escapeHtml(safeMediaUrl(heroDeal.thumbnail, heroDeal.title || 'Flash deal'))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', heroDeal.title || 'Flash deal'))}'">
           <span class="badge badge-sale" style="width:fit-content">${t('Up to {n}% off', { n: digits(heroDeal.discount) })}</span>
           <h3 class="mt-1" style="max-width:55%">${t("Today's flash deals")}</h3>
           <span class="small text-primary bold">${t('Shop deals')} →</span>
@@ -124,7 +124,7 @@ async function render() {
           const [bg, fg] = CAT_STYLE[c.id] || ['#e0e7ff', '#4338ca'];
           return `<a class="cat-tile" href="${routes.products({ category: c.id })}" style="--cat-bg:${bg};--cat-fg:${fg}">
             <div><b>${escapeHtml(t(c.name))}</b><span>${t('{n} sub-categories', { n: digits(c.children.length) })}</span></div>
-            <img src="${safeMediaUrl(categoryImage(c.id), c.name || 'Category')}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', c.name || 'Category')}'">
+            <img src="${escapeHtml(safeMediaUrl(categoryImage(c.id), c.name || 'Category'))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', c.name || 'Category'))}'">
           </a>`;
         }).join('')}
       </div>
@@ -174,11 +174,11 @@ async function render() {
     <section class="section reveal promo-grid">
       <a class="promo promo-a" href="${routes.products({ category: 'fashion' })}">
         <div><span class="badge">${t('New season')}</span><h3>${t('Fashion week')}</h3><p>${t('Fresh styles from top local brands')}</p><span class="btn btn-white btn-sm">${t('Shop fashion')}</span></div>
-        <img src="${safeMediaUrl(categoryImage('fashion'), 'Fashion') }" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', 'Fashion')}'">
+        <img src="${escapeHtml(safeMediaUrl(categoryImage('fashion'), 'Fashion'))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', 'Fashion'))}'">
       </a>
       <a class="promo promo-b" href="${routes.products({ category: 'electronics' })}">
         <div><span class="badge">${t('Tech fest')}</span><h3>${t('Gadgets up to 30% off')}</h3><p>${t('Phones, laptops and accessories')}</p><span class="btn btn-white btn-sm">${t('Shop electronics')}</span></div>
-        <img src="${safeMediaUrl(categoryImage('electronics'), 'Electronics')}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', 'Electronics')}'">
+        <img src="${escapeHtml(safeMediaUrl(categoryImage('electronics'), 'Electronics'))}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', 'Electronics'))}'">
       </a>
     </section>
 

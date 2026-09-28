@@ -29,7 +29,7 @@ export function channel(name) {
         });
 
       const streamId = name.startsWith('stream:') ? name.slice('stream:'.length) : null;
-      const tableMap = { orders: 'orders', products: 'products', live: 'live_streams' };
+      const tableMap = { orders: 'orders', products: 'products', live: 'live_streams', notifications: 'notifications' };
       const pgTable = streamId ? 'live_streams' : tableMap[name];
       if (pgTable) {
         const filter = streamId ? { event: '*', schema: 'public', table: pgTable, filter: `id=eq.${streamId}` } : { event: '*', schema: 'public', table: pgTable };

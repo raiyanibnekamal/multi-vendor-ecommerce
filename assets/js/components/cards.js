@@ -15,7 +15,7 @@ export function productCard(p) {
   return `
   <article class="p-card ${p.stock <= 0 ? 'out' : ''}">
     <a class="thumb" href="${routes.product(p.id)}">
-      <img src="${safeMediaUrl(p.thumbnail, p.title)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', p.title)}'">
+      <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'">
       <div class="badges">
         ${p.discount >= 5 ? `<span class="badge badge-sale">-${p.discount}%</span>` : ''}
         ${p.stock > 0 && p.stock <= 5 ? `<span class="badge badge-warning">Only ${p.stock} left</span>` : ''}
@@ -47,7 +47,7 @@ export function reelThumb(r) {
   const fallback = safeMediaUrl(productImage, product?.title || r.caption || 'Reel preview');
   return `
   <a class="reel-thumb" href="${routes.reels(r.id)}">
-    <img src="${poster}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'">
+    <img src="${escapeHtml(poster)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(fallback)}'">
     <div class="top"><span class="row" style="gap:4px">${icon('play')} ${formatNumber(r.views)}</span><span class="badge" style="background:rgba(0,0,0,.45);color:#fff">${icon('shopping-bag')} ${r.productIds.length}</span></div>
     <div class="play"><span>${icon('play')}</span></div>
     <div class="bottom"><p class="clamp-2">${escapeHtml(r.caption)}</p><span class="xs" style="opacity:.8">@${escapeHtml(v?.slug || '')}</span></div>
@@ -65,7 +65,7 @@ export function liveCard(s) {
   const thumb = safeMediaUrl(s.thumbnail, s.title || 'Live stream');
   return `
   <a class="live-card" href="${routes.watch(s.id)}">
-    <div class="thumb"><img src="${thumb}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${safeMediaUrl('', s.title || 'Live stream')}'"><div class="tl">${tag}</div></div>
+    <div class="thumb"><img src="${escapeHtml(thumb)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', s.title || 'Live stream'))}'"><div class="tl">${tag}</div></div>
     <div class="body">
       ${avatar(v?.name || '?', { size: 'sm', color: v?.color })}
       <div class="grow"><h4 class="clamp-2" style="font-size:14px">${escapeHtml(s.title)}</h4><span class="xs muted">${escapeHtml(v?.name || '')} · ${productCount} products</span></div>

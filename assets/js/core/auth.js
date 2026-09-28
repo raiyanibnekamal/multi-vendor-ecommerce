@@ -295,12 +295,20 @@ export function demoLogin(role) {
 }
 
 export async function register({ name, email, password, phone, role, storeName, storeCategory }) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 254) throw new Error('Enter a valid email address.');
+  if (typeof password !== 'string' || password.length < 6 || password.length > 128) throw new Error('Password must be 6 to 128 characters.');
+  if (!['customer', 'vendor'].includes(role)) throw new Error('Invalid account role.');
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) throw new Error('Name must be 2 to 100 characters.');
+  if (typeof phone !== 'string' || phone.trim().length > 30 || !/^\+?[0-9\s()-]{10,30}$/.test(phone.trim())) throw new Error('Enter a valid phone number.');
+  if (role === 'vendor' && (typeof storeName !== 'string' || storeName.trim().length < 2 || storeName.trim().length > 120)) throw new Error('Store name must be 2 to 120 characters.');
+
   if (CONFIG.USE_MOCK) {
-    if (db.all('users').some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+    if (db.all('users').some((user) => user.email.toLowerCase() === normalizedEmail)) {
       await respond(null, 300);
       throw new Error('An account with this email already exists.');
     }
-    const user = { id: uid('u'), name, email, password, phone, role, status: 'active', joinedAt: new Date().toISOString(), addresses: [] };
+    const user = { id: uid('u'), name: name.trim(), email: normalizedEmail, password, phone: phone.trim(), role, status: 'active', joinedAt: new Date().toISOString(), addresses: [] };
     if (role === 'vendor') {
       const vendor = {
         id: uid('v'), name: storeName, slug: storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ownerId: user.id, ownerName: name,
@@ -318,37 +326,13 @@ export async function register({ name, email, password, phone, role, storeName, 
   const supabase = await getSupabase();
   if (!supabase) throw new Error('Registration is unavailable. Check your connection and try again.');
   const { data, error } = await supabase.auth.signUp({
-    email: email.trim().toLowerCase(),
+    email: normalizedEmail,
     password,
     options: { data: { name, role, phone, storeName, storeCategory } },
   });
   if (error) throw new Error(error.message || 'Could not create your account.');
-  if (!data.user) throw new Error('Could not create your account.');
-
-  if (!data.session) {
-    const createdAt = data.user.created_at || new Date().toISOString();
-    const localUser = {
-      id: data.user.id,
-      name,
-      email: email.trim().toLowerCase(),
-      phone,
-      role,
-      status: 'active',
-      joinedAt: createdAt,
-      addresses: [],
-    };
-    if (role === 'vendor') {
-      const vendor = {
-        id: uid('v'), name: storeName, slug: storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ownerId: localUser.id,
-        ownerName: name, email: localUser.email, phone, location: 'Dhaka', color: '#2563eb',
-        description: `${storeName} — ${storeCategory || 'General store'}`, status: 'pending', verified: false,
-        rating: 0, followers: 0, joinedAt: createdAt, commissionRate: 10, balance: 0,
-      };
-      db.insertLocal('vendors', vendor);
-      localUser.vendorId = vendor.id;
-    }
-    db.insertLocal('users', localUser);
-    return startSession(localUser);
+  if (!data.user || !data.session) {
+    throw new Error('Account created. Confirm your email before signing in.');
   }
 
   const user = await syncAuthUser(supabase, data.user);
