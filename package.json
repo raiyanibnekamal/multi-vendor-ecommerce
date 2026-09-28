@@ -4,7 +4,6 @@
   "description": "StreamCart — Multi-vendor social commerce marketplace",
   "scripts": {
     "start": "node dev-server.mjs",
-    "dev": "node dev-server.mjs",
-    "build": "node -e \"console.log('Build complete')\""
+    "dev": "node dev-server.mjs"
   }
 }
