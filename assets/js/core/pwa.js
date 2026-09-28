@@ -9,13 +9,20 @@ export function registerSW() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
   if (registrationPromise) return registrationPromise;
 
-  registrationPromise = navigator.serviceWorker.getRegistrations().then(async (registrations) => {
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-  }).then(() => {
-    const root = document.body?.dataset?.root || './';
-    const swUrl = root.endsWith('/') ? `${root}sw.js?v=20260928-10` : `${root}/sw.js?v=20260928-10`;
-    return navigator.serviceWorker.register(swUrl, { scope: root || './' });
-  }).catch((err) => {
+  const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (isLocal) {
+    // In local development, ensure stale service workers are cleared without breaking active module fetches
+    registrationPromise = navigator.serviceWorker.getRegistrations().then((registrations) => {
+      if (registrations.length > 0) {
+        return Promise.all(registrations.map((r) => r.unregister()));
+      }
+    }).catch(() => null);
+    return registrationPromise;
+  }
+
+  const root = document.body?.dataset?.root || './';
+  const swUrl = root.endsWith('/') ? `${root}sw.js?v=20260928-11` : `${root}/sw.js?v=20260928-11`;
+  registrationPromise = navigator.serviceWorker.register(swUrl, { scope: root || './' }).catch((err) => {
     console.warn('[StreamCart PWA] Service Worker registration failed:', err);
     return null;
   });

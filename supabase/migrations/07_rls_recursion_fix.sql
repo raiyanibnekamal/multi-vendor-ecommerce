@@ -2,36 +2,58 @@
 
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS TEXT AS $$
-  SELECT role FROM public.profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+DECLARE
+  v_role TEXT;
+BEGIN
+  SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid();
+  RETURN v_role;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 CREATE OR REPLACE FUNCTION public.get_my_vendor_id()
 RETURNS TEXT AS $$
-  SELECT id FROM public.vendors WHERE owner_id = auth.uid() LIMIT 1;
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+DECLARE
+  v_id TEXT;
+BEGIN
+  SELECT id INTO v_id FROM public.vendors WHERE owner_id = auth.uid() LIMIT 1;
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 CREATE OR REPLACE FUNCTION public.order_has_vendor_item(p_order_id TEXT, p_vendor_id TEXT)
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
+BEGIN
+  IF p_order_id IS NULL OR p_vendor_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  RETURN EXISTS (
     SELECT 1 FROM public.order_items
     WHERE order_id = p_order_id AND vendor_id = p_vendor_id
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 CREATE OR REPLACE FUNCTION public.is_order_customer(p_order_id TEXT, p_user_id UUID)
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
+BEGIN
+  IF p_order_id IS NULL OR p_user_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  RETURN EXISTS (
     SELECT 1 FROM public.orders
     WHERE id = p_order_id AND customer_id = p_user_id
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 ALTER FUNCTION public.get_my_role() OWNER TO postgres;
 ALTER FUNCTION public.get_my_vendor_id() OWNER TO postgres;

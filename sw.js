@@ -1,5 +1,5 @@
 // StreamCart PWA Service Worker
-const CACHE_NAME = 'streamcart-v12-2026-09-28-icons';
+const CACHE_NAME = 'streamcart-v11-2026-09-28-cspfix';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -9,8 +9,6 @@ const PRECACHE_ASSETS = [
   './assets/css/layout.css',
   './assets/css/components.css',
   './assets/css/dashboard.css',
-  './assets/vendor/lucide.min.js',
-  './assets/vendor/chart.umd.min.js',
   './assets/img/icon.svg',
   './assets/img/icon-192.png',
   './assets/img/icon-512.png',
@@ -72,9 +70,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (!['http:', 'https:'].includes(url.protocol)) return;
 
-  // JavaScript must always come from the current deployment; stale modules break the app after updates.
+  // JavaScript must always come from the current deployment; bypass service worker fetch interception.
   if (url.origin === location.origin && (url.pathname.endsWith('.js') || event.request.destination === 'script')) {
-    event.respondWith(fetch(event.request));
     return;
   }
 

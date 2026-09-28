@@ -104,12 +104,16 @@ export async function updateOrderStatus(id, status) {
     const { data, error } = await supabase.rpc(rpc[0], rpc[1]);
     if (error) throw new Error(error.message || 'Could not update this order.');
     const itemStatuses = new Map((data.items || []).map((item) => [item.product_id, item.status]));
-    order = db.updateLocal('orders', id, (previous) => ({
-      status: data.order.status,
-      paymentStatus: data.order.payment_status,
-      ...(itemStatuses.size ? { items: previous.items.map((item) => ({ ...item, status: itemStatuses.get(item.productId) || item.status })) } : {}),
-      ...(user.role === 'customer' || status === 'cancelled' ? { items: previous.items.map((item) => ({ ...item, status: 'cancelled' })) } : {}),
-    }));
+    order = db.updateLocal('orders', id, (previous) => {
+      const prevItems = Array.isArray(previous?.items) ? previous.items : [];
+      return {
+        ...previous,
+        status: data.order.status,
+        paymentStatus: data.order.payment_status,
+        ...(itemStatuses.size ? { items: prevItems.map((item) => ({ ...item, status: itemStatuses.get(item.productId) || item.status })) } : {}),
+        ...(user.role === 'customer' || status === 'cancelled' ? { items: prevItems.map((item) => ({ ...item, status: 'cancelled' })) } : {}),
+      };
+    });
     (data.products || []).forEach((product) => {
       db.updateLocal('products', product.id, { stock: product.stock, sold: product.sold });
     });

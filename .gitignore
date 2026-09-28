@@ -8,3 +8,5 @@ Thumbs.db
 !.env.example
 
 .vercel
+diff_output.txt
+.vscode-test.json

@@ -10,7 +10,8 @@ The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://mult
 
 | File | Purpose |
 |---|---|
-| [`setup.sql`](setup.sql) | **All-in-one setup script** (Schema + RLS + Storage + Realtime + RPC). Copy and paste this directly into the Supabase SQL Editor. |
+| [`apply_all_forward_migrations.sql`](apply_all_forward_migrations.sql) | **Master Upgrade Script for Existing Databases.** Fixes RLS recursion, creates storage buckets, creates notifications, installs atomic commerce RPCs, and configures Realtime in one run. |
+| [`setup.sql`](setup.sql) | **Base setup script** (Schema + RLS + Storage + Realtime + RPC). Copy and paste this directly into the Supabase SQL Editor for new projects. |
 | [`seed.sql`](seed.sql) | Comprehensive seed data (Categories, Vendors, Products, Shoppable Reels, Live Streams, Payouts, Disputes). |
 | [`migrations/01_schema.sql`](migrations/01_schema.sql) | Core DDL tables, foreign key constraints, and automated counters triggers. |
 | [`migrations/02_rls.sql`](migrations/02_rls.sql) | Bulletproof Row Level Security (RLS) policies for Customer, Vendor, and Admin isolation. |
@@ -26,21 +27,20 @@ The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://mult
 
 ---
 
-## 🚀 Quick Setup Instructions (5 Minutes)
+## 🚀 Quick Setup Instructions
 
-### Step 1: Create a Free Project on Supabase
-1. Go to [supabase.com](https://supabase.com) and sign in.
-2. Click **New Project**.
-3. Choose a project name (e.g., `streamcart-backend`), set a database password, and select your nearest region (e.g., Singapore).
-4. Wait ~2 minutes for the database to provision.
+### For Existing Projects (Recommended)
+If you already ran the initial tables or are connecting to your existing Supabase project (such as `https://llgyqsfxiokvmxqhztin.supabase.co`):
+1. In your Supabase Dashboard, go to **SQL Editor** → **New Query**.
+2. Copy and paste the entire contents of [`apply_all_forward_migrations.sql`](apply_all_forward_migrations.sql).
+3. Click **Run** (Ctrl + Enter).
+   > ✅ This immediately fixes RLS recursion on `orders`, creates the 3 storage buckets (`product-images`, `reels`, `avatars`), sets up `notifications`, and installs all atomic checkout and payout RPCs.
 
-### Step 2: Run Database Setup (new project only)
-1. In your Supabase Dashboard, click on **SQL Editor** in the left sidebar.
-2. Click **New Query**.
-3. Copy the entire contents of [`supabase/setup.sql`](setup.sql) and paste it into the editor.
-4. Click **Run** (Ctrl + Enter).
-   > This all-in-one script is for a fresh project. Do not rerun it over an existing database; use the ordered migrations instead.
-5. Before seeding or connecting the app, run migrations `06_auth_order_hardening.sql`, `07_rls_recursion_fix.sql`, `08_backend_security_and_atomic_flows.sql`, `09_user_data_and_social_persistence.sql`, `10_production_security_hardening.sql`, and `11_order_payments_notifications.sql` in order. The all-in-one setup script contains the base schema and policies but not these forward hardening migrations.
+### For Completely New Projects
+1. Go to [supabase.com](https://supabase.com) and create a project.
+2. In the **SQL Editor**, run [`supabase/setup.sql`](setup.sql).
+3. In a new tab, run [`supabase/apply_all_forward_migrations.sql`](apply_all_forward_migrations.sql).
+4. Run [`supabase/seed.sql`](seed.sql) to populate initial mock vendors, products, and reels.
 
 ### Step 3: Populate Demo Seed Data
 1. In the **SQL Editor**, open a new tab.

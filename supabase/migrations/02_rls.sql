@@ -220,19 +220,29 @@ CREATE POLICY "Users can manage own wishlist"
 -- 11. ORDERS & ORDER ITEMS
 CREATE OR REPLACE FUNCTION public.order_has_vendor_item(p_order_id TEXT, p_vendor_id TEXT)
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
+BEGIN
+  IF p_order_id IS NULL OR p_vendor_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  RETURN EXISTS (
     SELECT 1 FROM public.order_items 
     WHERE order_id = p_order_id AND vendor_id = p_vendor_id
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 CREATE OR REPLACE FUNCTION public.is_order_customer(p_order_id TEXT, p_user_id UUID)
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
+BEGIN
+  IF p_order_id IS NULL OR p_user_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+  RETURN EXISTS (
     SELECT 1 FROM public.orders 
     WHERE id = p_order_id AND customer_id = p_user_id
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' SET row_security = off;
 
 ALTER FUNCTION public.order_has_vendor_item(TEXT, TEXT) OWNER TO postgres;
 ALTER FUNCTION public.is_order_customer(TEXT, UUID) OWNER TO postgres;
