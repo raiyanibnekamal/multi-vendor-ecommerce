@@ -8,7 +8,7 @@ StreamCart is a multi-vendor social-commerce marketplace that brings product dis
 
 Vendors get tools to manage products, orders, reels, and live sessions. Platform admins can review vendors and products, moderate content, manage disputes, and oversee marketplace activity.
 
-The project is built with HTML, CSS, and vanilla JavaScript. Supabase powers configured authentication and marketplace data; optional Groq AI features run through a Vercel serverless endpoint, with local fallbacks for demo use. Payment-provider processing and production live-video transport are not yet integrated.
+The project is built with HTML, CSS, and vanilla JavaScript. Supabase powers configured authentication and marketplace data; optional Groq AI features run through a Vercel serverless endpoint, with local fallbacks for demo use. Checkout currently supports COD plus secure mock card, bKash, and Nagad flows; real payment-provider capture and production live-video transport still require provider integration.
 
 Explore the [architecture](docs/ARCHITECTURE.md), [project audit and roadmap](docs/AUDIT_AND_ROADMAP.md), and [Supabase setup guide](supabase/README.md).
 
@@ -16,10 +16,12 @@ Explore the [architecture](docs/ARCHITECTURE.md), [project audit and roadmap](do
 
 - **Current status (Sept 2026):** polished storefront home, reels, live shopping, account flows, admin and vendor dashboards, and seeded demo commerce flows are in the repo and working as a frontend prototype.
 - **Supabase:** Auth bridge, Storage uploads, Realtime subscriptions, and secured order/write flows are implemented in source; the matching remote database migrations still need to be applied to a live project.
+- **Orders & payments:** Atomic order placement, stock locking, COD plus secure mock card/bKash/Nagad methods, customer/vendor/admin notifications, realtime dashboard updates, and downloadable/printable order slips are implemented.
+- **Security:** SQL/RPC privilege hardening, RLS boundaries, upload allowlists, media URL sanitization, API limits, CSP/HSTS/security headers, and migrations 10-11 are in the source tree.
 - **AI:** Optional Groq-backed ranking, recommendations, chat, tagging, descriptions, and moderation review through the server-side Vercel `/api/ai` proxy, with local heuristics as fallback.
 - **Multilingual UI:** English/Bangla toggle across core shopping, catalog, cart, checkout, and live-buy flows.
 - **Themes & PWA:** Light/dark modes, persistent theme state, install prompt support, offline caching, and service-worker-safe asset handling.
-- **What remains production-bound:** real payment provider integration, actual payout execution, live video provider token flow, and verified remote Supabase migration deployment.
+- **What remains production-bound:** replacing mock payments with a signed provider/webhook integration, actual payout execution, live video provider token flow, and verified remote Supabase migration deployment.
 
 ## Run locally
 
@@ -32,7 +34,15 @@ An internet connection is needed for fonts, icons (Lucide), charts (Chart.js), p
 
 ### Current backend status
 
-The Supabase project is configured in `assets/js/core/config.js`. Live auth, catalog reads, reel/stream reads, and order-related writes use Supabase when configured; demo accounts and offline state still use browser storage for local testing. Apply migrations 01–08 in order before using live registration, checkout, order status, follows, uploads, disputes, or payouts. Migration 07 fixes order-policy recursion; migration 08 protects profile/vendor fields and moves commerce writes behind checked RPCs. Checkout is COD-only until a payment provider and verified webhook are integrated. Refund issuance, payout transfer, and live-video transport still need external provider workflows.
+The Supabase project is configured in `assets/js/core/config.js`. Live auth, catalog reads, reel/stream reads, order writes, notifications, and Realtime updates use Supabase when configured; demo accounts and offline state still use browser storage for local testing. Apply migrations 01–11 in order before using live registration, checkout, order status, notifications, follows, uploads, disputes, or payouts. Migration 07 fixes order-policy recursion; migration 08 protects profile/vendor fields and moves commerce writes behind checked RPCs; migration 10 hardens public RPC privileges and stream messages; migration 11 adds payment metadata, secure mock-payment wrapping, order notifications, and Realtime publication. Checkout's card/bKash/Nagad options are mock-only until a provider and signed webhook are integrated. Refund issuance, payout transfer, and live-video transport still need external provider workflows.
+
+### Security and production readiness
+
+- Supabase RLS and security-definer RPCs enforce customer/vendor/admin boundaries; browser role guards are UX only.
+- SQL writes use fixed-parameter RPCs or Supabase query builders; no user-controlled dynamic SQL path is used.
+- Upload MIME/size allowlists, unsafe media URL rejection, HTML attribute escaping, API body/rate/concurrency limits, and Vercel CSP/HSTS/security headers are implemented.
+- Apply migrations 01-11 in the hosted Supabase project and verify them before production traffic. Do not put service-role or payment secrets in browser code.
+- Real payment capture requires an official gateway adapter, signed webhook verification, idempotency, failure handling, and refund reconciliation.
 
 ## Groq AI setup
 
@@ -55,8 +65,9 @@ The login page also has one-click demo buttons. Demo accounts and offline state 
 1. **Reels → Buy now:** open *Reels*, tap a tagged product, and check out without leaving the video.
 2. **Live shopping across tabs:** log in as the vendor, open *Go live studio*, then click *Open viewer page*. Pin a product or chat in the studio and watch it appear in the viewer tab; buy from the viewer tab and the order pops up in the studio.
 3. **Realtime orders:** keep the vendor dashboard open in one tab and place an order in another.
-4. **AI:** smart search (`phone under 30000`, `laptpo`), the assistant chat bubble, *For you* recommendations, and auto-tag suggestions on *Vendor → New reel*.
-5. **Admin:** approve pending vendors, moderate reels, resolve disputes, approve payouts, edit the category tree.
+4. **Order proof:** after checkout, download or print the order slip from the confirmation page.
+5. **AI:** smart search (`phone under 30000`, `laptpo`), the assistant chat bubble, *For you* recommendations, and auto-tag suggestions on *Vendor → New reel*.
+6. **Admin:** approve pending vendors, moderate reels, resolve disputes, approve payouts, edit the category tree.
 
 ## Pages
 
