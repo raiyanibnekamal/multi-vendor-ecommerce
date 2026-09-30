@@ -1,4 +1,4 @@
-// StreamCart — In-App Diagnostic Console & Problem Monitor
+// StreamCart — Comprehensive In-App Diagnostic Console & Universal Error Monitor
 import { CONFIG } from '../core/config.js';
 import { icon, formatPrice, escapeHtml } from '../core/utils.js';
 import { currentUser, demoLogin, logout } from '../core/auth.js';
@@ -12,49 +12,82 @@ const logs = window.__SC_CONSOLE_LOGS__;
 
 // Setup interceptors once
 let interceptorsInstalled = false;
-function installInterceptors() {
+export function installInterceptors() {
   if (interceptorsInstalled) return;
   interceptorsInstalled = true;
 
-  // Intercept window errors
+  // 1. Intercept Window Runtime Errors (Capture Phase to catch Element Loading Errors like <img>, <script>, <video>)
   window.addEventListener('error', (event) => {
+    const target = event.target;
+    // Check if error came from an HTML element failing to load (img, video, audio, link, script)
+    if (target && target !== window && target.tagName) {
+      const tag = target.tagName.toLowerCase();
+      const url = target.src || target.href || target.currentSrc || 'unknown URL';
+      addLog({
+        type: 'resource',
+        source: `<${tag}> Resource Error`,
+        message: `Failed to load asset: <${tag}> from "${url}"`,
+        location: url,
+        time: new Date().toLocaleTimeString(),
+        suggestion: `Verify that the file exists at this path, the CDN is online, and CORS permits loading.`
+      });
+      return;
+    }
+
+    // Regular JavaScript runtime error
     addLog({
       type: 'error',
-      source: 'Runtime Error',
+      source: event.error?.name || 'Runtime Exception',
       message: event.message || 'Unknown runtime error',
-      location: event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : 'unknown',
+      location: event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : 'window.onerror',
       stack: event.error?.stack || '',
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString(),
+      suggestion: 'Inspect the code near this line for undefined variables or missing null checks.'
     });
-  });
+  }, true); // true = capture phase
 
-  // Intercept unhandled promise rejections
+  // 2. Intercept Unhandled Promise Rejections (Async/Await errors)
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
+    const msg = typeof reason === 'string' ? reason : reason?.message || 'Unhandled asynchronous Promise rejection';
     addLog({
-      type: 'error',
+      type: 'rejection',
       source: 'Promise Rejection',
-      message: typeof reason === 'string' ? reason : reason?.message || 'Unhandled Promise rejection',
-      location: reason?.stack?.split('\n')?.[1]?.trim() || 'Promise handler',
+      message: msg,
+      location: reason?.stack?.split('\n')?.[1]?.trim() || 'Async handler',
       stack: reason?.stack || '',
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString(),
+      suggestion: 'Wrap the asynchronous call in try/catch or attach a .catch() handler.'
     });
   });
 
-  // Intercept console.error & console.warn safely
+  // 3. Intercept Content Security Policy (CSP) Violations
+  document.addEventListener('securitypolicyviolation', (e) => {
+    addLog({
+      type: 'security',
+      source: 'CSP Security Violation',
+      message: `Directive "${e.violatedDirective}" blocked resource: "${e.blockedURI || 'inline script/style'}"`,
+      location: `${e.sourceFile || 'document'}:${e.lineNumber || ''}`,
+      time: new Date().toLocaleTimeString(),
+      suggestion: `Whitelist "${e.blockedURI}" in vercel.json under "${e.violatedDirective}".`
+    });
+  });
+
+  // 4. Intercept console.error & console.warn
   const originalError = console.error;
   const originalWarn = console.warn;
 
   console.error = function (...args) {
     originalError.apply(console, args);
     const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-    // Filter out expected chrome extension noise
+    // Filter noise like browser extension banners
     if (!msg.includes('chrome-extension://') && !msg.includes('beforeinstallpromptevent')) {
       addLog({
         type: 'error',
-        source: 'console.error',
+        source: 'console.error()',
         message: msg,
-        time: new Date().toLocaleTimeString()
+        time: new Date().toLocaleTimeString(),
+        suggestion: 'This message was logged explicitly via console.error().'
       });
     }
   };
@@ -65,14 +98,15 @@ function installInterceptors() {
     if (!msg.includes('chrome-extension://')) {
       addLog({
         type: 'warn',
-        source: 'console.warn',
+        source: 'console.warn()',
         message: msg,
-        time: new Date().toLocaleTimeString()
+        time: new Date().toLocaleTimeString(),
+        suggestion: 'Warning logged by application or SDK.'
       });
     }
   };
 
-  // Intercept fetch network failures
+  // 5. Intercept window.fetch (Network failures & HTTP 4xx/5xx)
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || 'unknown';
@@ -82,29 +116,93 @@ function installInterceptors() {
         addLog({
           type: 'network',
           source: `HTTP ${response.status}`,
-          message: `Request failed: ${response.status} ${response.statusText} -> ${url}`,
+          message: `Network response failure: ${response.status} ${response.statusText} -> ${url}`,
           location: url,
-          time: new Date().toLocaleTimeString()
+          time: new Date().toLocaleTimeString(),
+          suggestion: `Endpoint returned HTTP ${response.status}. Verify server route or authentication headers.`
         });
       }
       return response;
     } catch (err) {
       addLog({
         type: 'network',
-        source: 'Network Error',
-        message: `Network request failed: ${err.message} -> ${url}`,
+        source: 'Fetch Network Error',
+        message: `Fetch failed completely: ${err.message} -> ${url}`,
         location: url,
         stack: err.stack,
-        time: new Date().toLocaleTimeString()
+        time: new Date().toLocaleTimeString(),
+        suggestion: 'Network request aborted, blocked by CORS, or client is offline.'
       });
       throw err;
     }
   };
+
+  // 6. Intercept XMLHttpRequest (XHR)
+  if (typeof XMLHttpRequest !== 'undefined') {
+    const originalXhrOpen = XMLHttpRequest.prototype.open;
+    const originalXhrSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this._scMethod = method;
+      this._scUrl = url;
+      return originalXhrOpen.apply(this, [method, url, ...rest]);
+    };
+
+    XMLHttpRequest.prototype.send = function (...args) {
+      this.addEventListener('load', function () {
+        if (this.status >= 400) {
+          addLog({
+            type: 'network',
+            source: `XHR ${this.status}`,
+            message: `XHR request failed: ${this.status} ${this.statusText} (${this._scMethod} ${this._scUrl})`,
+            location: this._scUrl,
+            time: new Date().toLocaleTimeString(),
+            suggestion: 'Backend returned an error. Check server endpoint logs.'
+          });
+        }
+      });
+      this.addEventListener('error', function () {
+        addLog({
+          type: 'network',
+          source: 'XHR Error',
+          message: `XHR failed to connect (${this._scMethod} ${this._scUrl})`,
+          location: this._scUrl,
+          time: new Date().toLocaleTimeString(),
+          suggestion: 'XHR network connection refused or blocked by CORS.'
+        });
+      });
+      return originalXhrSend.apply(this, args);
+    };
+  }
+
+  // 7. Intercept Media Devices (Camera/Microphone errors during Live streaming)
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async function (constraints) {
+      try {
+        return await originalGetUserMedia(constraints);
+      } catch (err) {
+        addLog({
+          type: 'webrtc',
+          source: 'Media Device Access Error',
+          message: `Camera/Microphone access failed: ${err.name} — ${err.message}`,
+          location: 'navigator.mediaDevices.getUserMedia',
+          time: new Date().toLocaleTimeString(),
+          suggestion: 'Ensure camera/microphone permissions are granted in browser settings.'
+        });
+        throw err;
+      }
+    };
+  }
 }
 
 function addLog(item) {
+  // Avoid duplicating identical messages within 2 seconds
+  const isDuplicate = logs.slice(0, 3).some((l) => l.message === item.message && l.type === item.type);
+  if (isDuplicate) return;
+
   logs.unshift(item);
-  if (logs.length > 60) logs.pop();
+  if (logs.length > 80) logs.pop();
   updateConsoleBadge();
   renderProblemListIfOpen();
 }
@@ -114,14 +212,14 @@ function updateConsoleBadge() {
   const dotEl = document.querySelector('.sc-console-dot');
   if (!badgeEl) return;
 
-  const errorCount = logs.filter((l) => l.type === 'error' || l.type === 'network').length;
-  const warnCount = logs.filter((l) => l.type === 'warn').length;
+  const severeErrors = logs.filter((l) => ['error', 'rejection', 'network', 'resource', 'security'].includes(l.type)).length;
+  const warnings = logs.filter((l) => l.type === 'warn' || l.type === 'webrtc').length;
 
-  badgeEl.textContent = errorCount > 0 ? errorCount : warnCount > 0 ? warnCount : '0';
-  if (errorCount > 0) {
+  badgeEl.textContent = severeErrors > 0 ? severeErrors : warnings > 0 ? warnings : '0';
+  if (severeErrors > 0) {
     badgeEl.className = 'sc-console-badge-count badge-error';
     if (dotEl) dotEl.className = 'sc-console-dot dot-red';
-  } else if (warnCount > 0) {
+  } else if (warnings > 0) {
     badgeEl.className = 'sc-console-badge-count badge-warn';
     if (dotEl) dotEl.className = 'sc-console-dot dot-amber';
   } else {
@@ -136,7 +234,7 @@ let problemFilter = 'all';
 function renderConsolePanel() {
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const envLabel = isLocal ? 'Localhost (Port 8000)' : 'Live Vercel (Production)';
-  const errorCount = logs.filter((l) => l.type === 'error' || l.type === 'network').length;
+  const errorCount = logs.filter((l) => ['error', 'rejection', 'network', 'resource', 'security'].includes(l.type)).length;
 
   return `
   <div class="sc-console-overlay" id="sc-console-overlay">
@@ -146,11 +244,11 @@ function renderConsolePanel() {
         <div class="sc-console-title-wrap">
           <div class="sc-console-logo-icon">${icon('terminal')}</div>
           <div>
-            <div class="sc-console-title">StreamCart System Console & Diagnostic Hub</div>
+            <div class="sc-console-title">StreamCart Universal Error Monitor & Diagnostics</div>
             <div class="sc-console-env">
               <span class="sc-env-tag ${isLocal ? 'env-local' : 'env-prod'}">${envLabel}</span>
               <span class="sc-status-tag ${errorCount === 0 ? 'status-ok' : 'status-err'}">
-                ${errorCount === 0 ? '🟢 100% Operational' : `🔴 ${errorCount} Issue${errorCount > 1 ? 's' : ''} Detected`}
+                ${errorCount === 0 ? '🟢 100% Operational (0 Errors)' : `🔴 ${errorCount} Issue${errorCount > 1 ? 's' : ''} Detected`}
               </span>
             </div>
           </div>
@@ -166,13 +264,13 @@ function renderConsolePanel() {
       <!-- Navigation Tabs -->
       <div class="sc-console-nav">
         <button class="sc-tab-btn ${activeTab === 'problems' ? 'active' : ''}" data-tab="problems">
-          ${icon('alert-triangle')} Problems & Logs <span class="sc-tab-counter">${logs.length}</span>
+          ${icon('alert-triangle')} Captured Issues <span class="sc-tab-counter">${logs.length}</span>
         </button>
         <button class="sc-tab-btn ${activeTab === 'health' ? 'active' : ''}" data-tab="health">
-          ${icon('activity')} Live System Health
+          ${icon('activity')} Live Service Health
         </button>
         <button class="sc-tab-btn ${activeTab === 'tools' ? 'active' : ''}" data-tab="tools">
-          ${icon('wrench')} Quick Fixes & Self-Test
+          ${icon('wrench')} Error Simulators & Tools
         </button>
       </div>
 
@@ -182,11 +280,14 @@ function renderConsolePanel() {
           <div class="sc-filters-bar">
             <div class="sc-chips">
               <button class="sc-chip ${problemFilter === 'all' ? 'active' : ''}" data-filter="all">All (${logs.length})</button>
-              <button class="sc-chip ${problemFilter === 'error' ? 'active' : ''}" data-filter="error">Errors (${logs.filter((l) => l.type === 'error').length})</button>
+              <button class="sc-chip ${problemFilter === 'error' ? 'active' : ''}" data-filter="error">JS Errors (${logs.filter((l) => l.type === 'error').length})</button>
               <button class="sc-chip ${problemFilter === 'network' ? 'active' : ''}" data-filter="network">Network (${logs.filter((l) => l.type === 'network').length})</button>
+              <button class="sc-chip ${problemFilter === 'resource' ? 'active' : ''}" data-filter="resource">Assets/Media (${logs.filter((l) => l.type === 'resource').length})</button>
+              <button class="sc-chip ${problemFilter === 'security' ? 'active' : ''}" data-filter="security">Security/CSP (${logs.filter((l) => l.type === 'security').length})</button>
+              <button class="sc-chip ${problemFilter === 'rejection' ? 'active' : ''}" data-filter="rejection">Promises (${logs.filter((l) => l.type === 'rejection').length})</button>
               <button class="sc-chip ${problemFilter === 'warn' ? 'active' : ''}" data-filter="warn">Warnings (${logs.filter((l) => l.type === 'warn').length})</button>
             </div>
-            <span class="sc-hint">Real-time captured runtime events & failed requests</span>
+            <span class="sc-hint">Catches runtime, network, broken media, CSP & promises</span>
           </div>
           <div class="sc-problem-list" id="sc-problem-list">
             ${renderProblemItems()}
@@ -201,6 +302,19 @@ function renderConsolePanel() {
 
         <div id="sc-tab-tools" class="sc-tab-pane ${activeTab === 'tools' ? 'active' : ''}">
           <div class="sc-tools-grid">
+            <div class="sc-tool-card" style="grid-column: 1 / -1; background: var(--surface);">
+              <h4>${icon('shield-alert')} Comprehensive Error Trigger & Test Matrix</h4>
+              <p>Click any test button below to simulate that error type and verify that our error interceptors capture it in real-time:</p>
+              <div class="sc-role-buttons" style="gap:8px; margin-top:10px">
+                <button class="sc-btn sc-btn-sm sc-btn-danger" id="sc-sim-js-err">${icon('alert-octagon')} Test JS Runtime Error</button>
+                <button class="sc-btn sc-btn-sm sc-btn-danger" id="sc-sim-net-err">${icon('wifi-off')} Test Network 404 Fetch</button>
+                <button class="sc-btn sc-btn-sm sc-btn-danger" id="sc-sim-img-err">${icon('image')} Test Broken Image Load</button>
+                <button class="sc-btn sc-btn-sm sc-btn-danger" id="sc-sim-promise-err">${icon('zap')} Test Promise Rejection</button>
+                <button class="sc-btn sc-btn-sm sc-btn-danger" id="sc-sim-csp-err">${icon('shield')} Test CSP Security Check</button>
+                <button class="sc-btn sc-btn-sm sc-btn-outline" id="sc-sim-warn">${icon('alert-triangle')} Test Console Warning</button>
+              </div>
+            </div>
+
             <div class="sc-tool-card">
               <h4>${icon('database')} Local Storage & Seed Repair</h4>
               <p>Resets corrupt local storage state, cleans cached carts and reloads verified demo seeds.</p>
@@ -251,11 +365,11 @@ function renderProblemItems() {
     <div class="sc-empty-state">
       <div class="sc-empty-icon">${icon('shield-check')}</div>
       <h3>Zero Problems Detected</h3>
-      <p>The platform is running smoothly with no active JavaScript errors or failed network requests.</p>
+      <p>The platform is running smoothly with no active JavaScript errors, failed network requests, or broken assets.</p>
     </div>`;
   }
 
-  return filtered.map((item, idx) => `
+  return filtered.map((item) => `
     <div class="sc-problem-item ${item.type}">
       <div class="sc-problem-top">
         <span class="sc-type-pill ${item.type}">${item.type.toUpperCase()}</span>
@@ -264,6 +378,7 @@ function renderProblemItems() {
       </div>
       <div class="sc-problem-msg">${escapeHtml(item.message)}</div>
       ${item.location ? `<div class="sc-problem-loc">Location: <code>${escapeHtml(item.location)}</code></div>` : ''}
+      ${item.suggestion ? `<div class="sc-problem-suggest">💡 <b>Suggested Fix:</b> ${escapeHtml(item.suggestion)}</div>` : ''}
       ${item.stack ? `<details class="sc-problem-stack"><summary>View Stack Trace</summary><pre>${escapeHtml(item.stack)}</pre></details>` : ''}
     </div>
   `).join('');
@@ -443,9 +558,7 @@ function runE2ETests() {
 
   setTimeout(() => {
     const results = [];
-    // Test 1: Config
     results.push({ name: 'Configuration Integrity', pass: Boolean(CONFIG.APP_NAME && CONFIG.CURRENCY), msg: 'Config tokens loaded' });
-    // Test 2: Local storage
     try {
       localStorage.setItem('sc_test_key', '1');
       localStorage.removeItem('sc_test_key');
@@ -453,15 +566,11 @@ function runE2ETests() {
     } catch {
       results.push({ name: 'LocalStorage Access', pass: false, msg: 'Quota exceeded or private mode error' });
     }
-    // Test 3: Session
     const user = currentUser();
     results.push({ name: 'User Authentication', pass: true, msg: user ? `Logged in as ${user.role} (${user.email})` : 'Guest shopper mode active' });
-    // Test 4: Pricing logic
     const priceFormatted = formatPrice(1250);
     results.push({ name: 'Bangladeshi Taka Formatter', pass: priceFormatted.includes('৳'), msg: `Output: ${priceFormatted}` });
-    // Test 5: Error Interceptors
-    results.push({ name: 'Telemetry & Interceptors', pass: interceptorsInstalled, msg: 'Active and monitoring' });
-    // Test 6: Responsive Layout
+    results.push({ name: 'Universal Error Interceptors', pass: interceptorsInstalled, msg: 'Active across runtime, network, media & CSP' });
     const hasApp = Boolean(document.getElementById('app'));
     results.push({ name: 'DOM Shell Container', pass: hasApp, msg: '#app mountpoint present' });
 
@@ -483,10 +592,10 @@ function copyDiagnosticReport() {
     user: currentUser() ? { id: currentUser().id, role: currentUser().role, email: currentUser().email } : 'guest',
     health: healthStatus,
     capturedIssuesCount: logs.length,
-    recentIssues: logs.slice(0, 15)
+    recentIssues: logs.slice(0, 20)
   };
   navigator.clipboard.writeText(JSON.stringify(report, null, 2)).then(() => {
-    alert('✅ Diagnostic report copied to clipboard! You can paste it into issues or chat.');
+    alert('✅ Diagnostic report copied to clipboard!');
   }).catch(() => {
     prompt('Copy diagnostic report JSON below:', JSON.stringify(report));
   });
@@ -520,13 +629,55 @@ function bindConsoleEvents() {
     };
   });
 
-  // Actions
+  // Header Actions
   document.getElementById('sc-run-all-tests-btn')?.addEventListener('click', runAllHealthChecks);
   document.getElementById('sc-copy-report-btn')?.addEventListener('click', copyDiagnosticReport);
   document.getElementById('sc-clear-logs-btn')?.addEventListener('click', () => {
     logs.length = 0;
     updateConsoleBadge();
     renderProblemListIfOpen();
+  });
+
+  // Error Simulators
+  document.getElementById('sc-sim-js-err')?.addEventListener('click', () => {
+    setTimeout(() => {
+      // Intentionally trigger a ReferenceError
+      window.__undefinedFunctionCallForTesting();
+    }, 10);
+    openConsole('problems');
+  });
+
+  document.getElementById('sc-sim-net-err')?.addEventListener('click', () => {
+    fetch('/api/non-existent-endpoint-test-404').catch(() => {});
+    openConsole('problems');
+  });
+
+  document.getElementById('sc-sim-img-err')?.addEventListener('click', () => {
+    const img = new Image();
+    img.src = 'https://streamcart-ecommerce.example.invalid/broken-image-404.jpg';
+    document.body.appendChild(img);
+    setTimeout(() => img.remove(), 1000);
+    openConsole('problems');
+  });
+
+  document.getElementById('sc-sim-promise-err')?.addEventListener('click', () => {
+    Promise.reject(new Error('Simulated unhandled async promise rejection in StreamCart.'));
+    openConsole('problems');
+  });
+
+  document.getElementById('sc-sim-csp-err')?.addEventListener('click', () => {
+    try {
+      const script = document.createElement('script');
+      script.src = 'https://blocked-malicious-domain.example.invalid/exploit.js';
+      document.head.appendChild(script);
+      setTimeout(() => script.remove(), 1000);
+    } catch {}
+    openConsole('problems');
+  });
+
+  document.getElementById('sc-sim-warn')?.addEventListener('click', () => {
+    console.warn('StreamCart Warning: Sample simulated warning test message.');
+    openConsole('problems');
   });
 
   // Quick tools
