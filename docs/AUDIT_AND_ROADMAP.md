@@ -1,6 +1,6 @@
 # StreamCart — Comprehensive Codebase Audit, Gaps & Implementation Roadmap
 
-> **Audit Date:** 2026-09-30
+> **Audit Date:** 2026-10-01
 > **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`
 > **Status:** Fully Audited & Ready for Production Push
 > **Live app:** [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/)
@@ -9,14 +9,15 @@
 
 ## 📊 1. Codebase Overview & Current Status
 
-> **Status snapshot (2026-09-30):** The application has completed end-to-end frontend, backend, live streaming, AI intelligence, and authentication auditing. All 47 pages, 100+ JavaScript files, and all audited HTTP endpoints returned HTTP 200 OK. Master migration script `supabase/apply_all_forward_migrations.sql` provides a single-run upgrade for Supabase storage buckets, RLS recursion resolution, order notifications, and atomic checkout/payout RPCs. Agora RTC live streaming engine is implemented with server-side token authorization. Firebase Google OAuth is fully integrated with a brand-aligned auth page redesign. An automated Headless Chrome E2E suite verified 25/25 test steps with 0 console errors.
+> **Status snapshot (2026-10-01):** The application has completed end-to-end frontend, backend, live streaming, AI intelligence, and authentication auditing. All 47 pages, 106 JavaScript files, and all audited HTTP endpoints returned HTTP 200 OK. Master migration script `supabase/apply_all_forward_migrations.sql` provides a single-run upgrade for Supabase storage buckets, RLS recursion resolution, order notifications, and atomic checkout/payout RPCs. Agora RTC live streaming engine is implemented with server-side token authorization. Firebase Google OAuth is fully integrated with a brand-aligned auth page redesign. An automated Headless Chrome smoke test verified 12/12 key pages with 0 page errors and full Light/Dark mode functionality.
 
 - **Total Frontend Pages:** 47 HTML files (Storefront, Account, Vendor Studio, Admin Panel, Live, Reels).
-- **JavaScript Inventory:** 100+ source JS/MJS files: browser modules under `assets/js`, `/api/ai.js`, `/api/agora-token.js`, `/api/firebase-config.js`, `sw.js`, and `dev-server.mjs` — **0 syntax errors**, **0 broken relative imports**.
-- **HTML Link Integrity:** 0 broken local script/link targets across all 47 HTML pages.
+- **Default Theme:** Light Mode by default across all 47 HTML pages, with instant toggle to Dark Mode and `localStorage` state persistence.
+- **JavaScript Inventory:** 106 source JS/MJS files: browser modules under `assets/js`, `/api/ai.js`, `/api/agora-token.js`, `/api/firebase-config.js`, `sw.js`, and `dev-server.mjs` — **0 syntax errors**, **0 broken relative imports**.
+- **HTML Link Integrity:** 0 broken local script/link targets across all 47 HTML pages (287 verified links).
 - **Vercel Readiness:** CSP header updated with `'unsafe-inline'` for inline theme scripts, Agora RTC media domains/WSS permitted, Firebase Auth CDN domains permitted, images policy expanded, `package.json` configured for zero-config Vercel hosting, and `.gitignore` protects development dumps.
 - **Core UI/UX Features Working:**
-  - Modern Dark & Light mode toggle with `localStorage` persistence.
+  - Modern Light mode default with Dark mode toggle & `localStorage` persistence.
   - Video Commerce: Reels vertical swipe with Quick-Buy modal drawer.
   - Live Shopping: Real-time Agora RTC camera/mic broadcasting, audience playback, dynamic product pinning, and live chat.
   - Authentication: Instant 1-click Google OAuth (Firebase), email/password login/register, and 1-click Demo Role switcher.

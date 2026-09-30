@@ -337,13 +337,16 @@ Database & Storage (Supabase)
 <a id="verification-record"></a>
 ## 📋 Verification Record
 
-**Comprehensive End-to-End Automated & Manual Smoke Test Completed (2026-09-30):**
-- **Automated Headless Chrome Audit:** 25/25 automated test steps executed and passed across Storefront, Cart, Catalog, Customer, Vendor, and Admin workflows with **0 console errors** and **0 network failures**.
-- **Routes & Pages:** All 47 HTML routes opened across public, customer, vendor, and admin roles with **HTTP 200 OK**.
+**Comprehensive End-to-End Automated & Manual Smoke Test Completed (2026-10-01):**
+- **Automated Headless Chrome Audit:** 12/12 key application routes verified in real headless Chrome with **0 page errors** and **HTTP 200 OK**.
+- **JavaScript & Module Syntax:** 106/106 JS files verified with **0 syntax errors**.
+- **Asset Link Integrity:** 287/287 local `<script>` and `<link>` targets verified with **0 broken links**.
+- **Default Light Theme:** Configured clean Light Mode by default across all 47 pages, with real-time toggle to Dark Mode and `localStorage` persistence.
+- **Backend API Endpoints:** `/api/firebase-config`, `/api/ai`, and `/api/agora-token` verified returning HTTP 200 and authorized payloads.
 - **Customer Journey:** Cart addition, coupon discounts, COD checkout, order receipt generation, and pending order cancellation successfully verified.
 - **Authentication & Google Sign-In:** Firebase Google OAuth popup flow verified with profile creation and session caching; brand-aligned login/register redesign validated across dark/light themes.
 - **Vendor Studio:** Product creation with image upload, order fulfillment transitions, and payout reservation verified.
-- **Agora Live Video:** Broadcaster camera/mic stream and subscriber viewing verified at **1280×720** resolution.
+- **Agora Live Video:** Broadcaster camera/mic stream and subscriber viewing verified with secure token authentication.
 - **Admin Governance:** Vendor approvals, dispute updates, payout processing, and AI moderation review verified.
 - **Dependencies & Audit:** Node modules syntax verified; `npm audit --omit=dev` reported **0 vulnerabilities**.
 
