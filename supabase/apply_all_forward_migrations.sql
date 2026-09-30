@@ -128,38 +128,64 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Storage RLS
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Storage Policies (wrapped in exception-safe block so storage permissions never abort the migration)
+DO $$
+BEGIN
+  BEGIN
+    DROP POLICY IF EXISTS "Public Read: product-images" ON storage.objects;
+    CREATE POLICY "Public Read: product-images"
+      ON storage.objects FOR SELECT
+      USING (bucket_id = 'product-images');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Public Read: product-images: %', SQLERRM;
+  END;
 
-DROP POLICY IF EXISTS "Public Read: product-images" ON storage.objects;
-CREATE POLICY "Public Read: product-images"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'product-images');
+  BEGIN
+    DROP POLICY IF EXISTS "Authenticated Upload: product-images" ON storage.objects;
+    CREATE POLICY "Authenticated Upload: product-images"
+      ON storage.objects FOR INSERT
+      WITH CHECK (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Authenticated Upload: product-images: %', SQLERRM;
+  END;
 
-DROP POLICY IF EXISTS "Authenticated Upload: product-images" ON storage.objects;
-CREATE POLICY "Authenticated Upload: product-images"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+  BEGIN
+    DROP POLICY IF EXISTS "Public Read: reels" ON storage.objects;
+    CREATE POLICY "Public Read: reels"
+      ON storage.objects FOR SELECT
+      USING (bucket_id = 'reels');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Public Read: reels: %', SQLERRM;
+  END;
 
-DROP POLICY IF EXISTS "Public Read: reels" ON storage.objects;
-CREATE POLICY "Public Read: reels"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'reels');
+  BEGIN
+    DROP POLICY IF EXISTS "Authenticated Upload: reels" ON storage.objects;
+    CREATE POLICY "Authenticated Upload: reels"
+      ON storage.objects FOR INSERT
+      WITH CHECK (bucket_id = 'reels' AND auth.role() = 'authenticated');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Authenticated Upload: reels: %', SQLERRM;
+  END;
 
-DROP POLICY IF EXISTS "Authenticated Upload: reels" ON storage.objects;
-CREATE POLICY "Authenticated Upload: reels"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'reels' AND auth.role() = 'authenticated');
+  BEGIN
+    DROP POLICY IF EXISTS "Public Read: avatars" ON storage.objects;
+    CREATE POLICY "Public Read: avatars"
+      ON storage.objects FOR SELECT
+      USING (bucket_id = 'avatars');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Public Read: avatars: %', SQLERRM;
+  END;
 
-DROP POLICY IF EXISTS "Public Read: avatars" ON storage.objects;
-CREATE POLICY "Public Read: avatars"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'avatars');
-
-DROP POLICY IF EXISTS "Authenticated Upload: avatars" ON storage.objects;
-CREATE POLICY "Authenticated Upload: avatars"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+  BEGIN
+    DROP POLICY IF EXISTS "Authenticated Upload: avatars" ON storage.objects;
+    CREATE POLICY "Authenticated Upload: avatars"
+      ON storage.objects FOR INSERT
+      WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping policy Authenticated Upload: avatars: %', SQLERRM;
+  END;
+END;
+$$;
 
 -- ------------------------------------------------------------------------------
 -- 3. ORDERS TABLE PAYMENT METADATA & ORDER CONSTRAINTS
