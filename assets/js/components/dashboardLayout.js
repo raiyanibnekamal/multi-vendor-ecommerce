@@ -9,6 +9,7 @@ import { logoHtml } from './header.js';
 import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
 import { toast } from './toast.js';
+import { mountConsoleWidget } from './consoleWidget.js';
 
 function vendorNav(vendor) {
   const vendorId = vendor?.id ?? null;
@@ -125,6 +126,7 @@ export function mountDashboard({ role, active, title }) {
   app.querySelector('[data-toggle]').onclick = (e) => { e.stopPropagation(); side.classList.toggle('open'); };
   document.addEventListener('click', (e) => { if (!e.target.closest('[data-side]')) side.classList.remove('open'); });
   initIcons();
+  mountConsoleWidget();
   const content = app.querySelector('[data-content]');
   content.user = user;
   content.vendor = vendor;

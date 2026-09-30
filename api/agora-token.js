@@ -36,8 +36,17 @@ async function supabaseGet(table, filters, authorization) {
 }
 
 module.exports = async function handler(req, res) {
+  if (req.method === 'GET') {
+    return send(res, 200, {
+      status: 'ok',
+      service: 'StreamCart Agora Token Service',
+      configured: Boolean(process.env.AGORA_APP_ID && process.env.AGORA_APP_CERTIFICATE),
+      appId: process.env.AGORA_APP_ID || null,
+      timestamp: new Date().toISOString()
+    });
+  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'GET, POST');
     return send(res, 405, { error: 'Method not allowed.' });
   }
 

@@ -23,11 +23,11 @@ export const CONFIG = {
   },
 
   FIREBASE: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: '',
+    apiKey: 'AIzaSyCUipCPz33AX7aEy8ujAUx_bCHXzttXb40',
+    authDomain: 'streamcart-ecommerce.firebaseapp.com',
+    projectId: 'streamcart-ecommerce',
+    storageBucket: 'streamcart-ecommerce.firebasestorage.app',
+    messagingSenderId: '628372812603',
+    appId: '1:628372812603:web:6594df2ea37d7b8c183d1e',
   },
 };
