@@ -217,11 +217,29 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`========================================`);
-  console.log(`StreamCart Fullstack Server Running at:`);
-  console.log(`👉 http://${HOST}:${PORT}`);
-  console.log(`👉 http://localhost:${PORT}`);
-  console.log(`Static Files + Supabase + /api/ai Ready`);
-  console.log(`========================================`);
+let currentPort = PORT;
+
+function startServer(port) {
+  currentPort = port;
+  server.listen(port, HOST, () => {
+    console.log(`========================================`);
+    console.log(`StreamCart Fullstack Server Running at:`);
+    console.log(`👉 http://${HOST}:${port}`);
+    console.log(`👉 http://localhost:${port}`);
+    console.log(`Static Files + Supabase + /api/ai Ready`);
+    console.log(`========================================`);
+  });
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const nextPort = currentPort + 1;
+    console.warn(`[Server] Notice: Port ${currentPort} is currently in use. Falling back to port ${nextPort}...`);
+    setTimeout(() => startServer(nextPort), 300);
+  } else {
+    console.error('[Server Error]', err);
+    process.exit(1);
+  }
 });
+
+startServer(PORT);
