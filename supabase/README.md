@@ -1,8 +1,8 @@
 # StreamCart — Supabase Backend Guide
 
-This folder contains the Supabase schema, policies, seed data, and deployment scripts used by StreamCart. It is not a complete production commerce backend by itself; payment webhooks, payout execution, and live-video transport still require trusted provider integrations.
+This folder contains the Supabase schema, policies, seed data, and deployment scripts used by StreamCart. The app includes Agora RTC transport, but a production launch still requires correctly configured Agora/Vercel credentials and network validation. Payment webhooks, actual payout transfers, and automatic refund execution still require trusted provider integrations.
 
-The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). The current repo state includes the full demo storefront, live-buy flows, vendor/admin consoles, AI-assisted commerce features, and the Supabase bridge for live auth/data. Apply migrations through 08 before using the updated live registration, checkout, order status, and payout flows. Migration 07 fixes recursive order RLS; migration 08 adds server-authoritative commerce operations and profile/vendor protections.
+The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). The current repo state includes the demo storefront, live-buy flows, vendor/admin consoles, optional AI integration, Agora RTC transport, and the Supabase bridge for live auth/data. Apply migrations 01-11 in order before using the corresponding live workflows. Migration 07 fixes recursive order RLS; migration 08 adds server-authoritative commerce operations and profile/vendor protections; migrations 09-11 add social persistence, security hardening, and order notifications.
 
 ---
 
@@ -78,4 +78,6 @@ Migration 08 hardens `place_order_atomic`: it derives price, totals, coupon, and
 
 Migration 08 also creates a vendor's pending store in the `auth.users` trigger from signup metadata, so vendor registration remains complete when email confirmation is enabled. The frontend refreshes profile, vendor, order, and follow data after login. Password changes use Supabase Auth and verify the current password.
 
-Migration 08 also protects profile roles/status and vendor approval, ownership, commission, and balance fields. Vendor payout reservation/rejection is transactional, but transfer to a bank or wallet remains an external manual operation. Do not place a Supabase service-role key in frontend configuration. Guest checkout is intentionally unsupported; order creation requires a matching Supabase Auth user.
+For Google Authentication, the client utilizes modular Firebase Auth (`assets/js/core/firebase.js`) and bridges the authenticated Google user to Supabase by synchronizing the user's UUID/id, display name, email, and avatar photo into the `public.profiles` table.
+
+Migration 08 also protects profile roles/status and vendor approval, ownership, commission, and balance fields. Vendor payout reservation/rejection is transactional, but transfer to a bank or wallet remains an external manual operation. Do not place a Supabase service-role key in frontend configuration. Guest checkout is intentionally unsupported; order creation requires a matching authenticated user.

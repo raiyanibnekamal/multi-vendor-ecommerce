@@ -33,6 +33,7 @@ const POSTGRES_TABLES = {
 
 const cache = {};
 const tableKey = (t) => `db_${t}`;
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 function hydrateSeedRow(table, row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
@@ -105,7 +106,14 @@ function persist(table) {
 }
 
 function hasUuidCustomerId(row) {
-  return typeof row.customerId === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(row.customerId);
+  return typeof row.customerId === 'string' && UUID_PATTERN.test(row.customerId);
+}
+
+function usesLocalDemoSession() {
+  const session = store.get('session');
+  const email = String(session?.email || '').toLowerCase();
+  const isDemoAccount = Object.values(CONFIG.DEMO_ACCOUNTS).some((account) => account.email.toLowerCase() === email);
+  return isDemoAccount && !UUID_PATTERN.test(session?.userId || '');
 }
 
 function insertLocal(table, row) {
@@ -116,7 +124,7 @@ function insertLocal(table, row) {
 
 // Background sync from live Supabase
 async function syncFromSupabase() {
-  if (CONFIG.USE_MOCK) return;
+  if (CONFIG.USE_MOCK || usesLocalDemoSession()) return;
   const supabase = await getSupabase();
   if (!supabase) return;
   const { data: authData } = await supabase.auth.getSession();
@@ -297,7 +305,7 @@ export const db = {
     if (table === 'orders') throw new Error('Use placeOrderAtomic to create orders.');
     insertLocal(table, row);
 
-    if (!CONFIG.USE_MOCK && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
+    if (!CONFIG.USE_MOCK && !usesLocalDemoSession() && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
       writeToSupabase(table, row).catch((err) => console.warn(`[StreamCart] Supabase insert failed for ${table}:`, err));
     }
 
@@ -305,7 +313,7 @@ export const db = {
   },
   async insertAndSync(table, row) {
     if (table === 'orders') return db.placeOrderAtomic(row);
-    if (!CONFIG.USE_MOCK && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
+    if (!CONFIG.USE_MOCK && !usesLocalDemoSession() && table !== 'users' && !(table === 'orders' && !hasUuidCustomerId(row))) {
       await writeToSupabase(table, row);
     }
     return insertLocal(table, row);
@@ -367,7 +375,7 @@ export const db = {
     const row = db.updateLocal(table, id, updated);
     if (!row) return null;
 
-    if (!CONFIG.USE_MOCK) {
+    if (!CONFIG.USE_MOCK && !usesLocalDemoSession()) {
       getSupabase().then(async (supabase) => {
         if (!supabase) return;
         const pgTable = POSTGRES_TABLES[table] || table;
@@ -399,7 +407,7 @@ export const db = {
     const current = db.get(table, id);
     if (!current) return null;
     const updated = typeof patch === 'function' ? patch(current) : patch;
-    if (!CONFIG.USE_MOCK) {
+    if (!CONFIG.USE_MOCK && !usesLocalDemoSession()) {
       const supabase = await getSupabase();
       if (!supabase) throw new Error('Database service is unavailable. Please try again.');
       const pgTable = POSTGRES_TABLES[table] || table;
@@ -427,7 +435,7 @@ export const db = {
     return db.updateLocal(table, id, updated);
   },
   async removeAndSync(table, id) {
-    if (!CONFIG.USE_MOCK) {
+    if (!CONFIG.USE_MOCK && !usesLocalDemoSession()) {
       const supabase = await getSupabase();
       if (!supabase) throw new Error('Database service is unavailable. Please try again.');
       const { error } = await supabase.from(POSTGRES_TABLES[table] || table).delete().eq('id', id);
@@ -439,7 +447,7 @@ export const db = {
     persist(table);
   },
   async resolveDispute(id, status, note) {
-    if (CONFIG.USE_MOCK) {
+    if (CONFIG.USE_MOCK || usesLocalDemoSession()) {
       const current = db.get('disputes', id);
       if (!current || !['open', 'in_review'].includes(current.status)) throw new Error('Dispute is not open for resolution.');
       return db.updateLocal('disputes', id, {

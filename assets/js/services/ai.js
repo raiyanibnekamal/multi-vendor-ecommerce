@@ -30,7 +30,7 @@ function localStaticAiDisabled() {
 async function callAI(action, input) {
   if (aiUnavailable || typeof location === 'undefined' || localStaticAiDisabled()) return null;
   const controller = new AbortController();
-  const timeoutMs = ['rank-products', 'rank-reels'].includes(action) ? 3_500 : 8_000;
+  const timeoutMs = 12_000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch('/api/ai', {

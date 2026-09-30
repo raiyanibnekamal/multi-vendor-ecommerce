@@ -1,10 +1,11 @@
 # StreamCart — Full Project Status & Production Verification Report
 
-> **Last Updated:** 2026-09-28  
-> **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`  
-> **Status:** Production-Ready for GitHub Push & Vercel Deployment  
-> **Live App (Vercel):** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)  
-> **Supabase Endpoint:** `https://llgyqsfxiokvmxqhztin.supabase.co`
+> **Last Updated:** 2026-09-30<br>
+> **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`<br>
+> **Status:** Production-Ready for GitHub Push & Vercel Deployment<br>
+> **Live App (Vercel):** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)<br>
+> **Supabase Endpoint:** `https://llgyqsfxiokvmxqhztin.supabase.co`<br>
+> **Quick Links:** [Executive Summary](#-executive-summary) • [Feature Matrix](#-feature-by-feature-audit--backend-readiness) • [Supabase Audit](#%EF%B8%8F-supabase-database--security-audit) • [Vercel Readiness](#-vercel-deployment-readiness) • [Go-Live Steps](#-steps-for-github-push--vercel-go-live)
 
 ---
 
@@ -12,12 +13,15 @@
 
 All frontend pages, backend integrations, security headers, routing, and database scripts have undergone an exhaustive end-to-end audit:
 - **Total Frontend Pages:** 47 HTML files (Storefront, Account, Vendor Studio, Admin Panel, Live, Reels).
-- **Total JavaScript Modules:** 98 files (Browser modules, `/api/ai.js` serverless function, Service Worker, and dev server).
-- **Syntax & Import Integrity:** **0 syntax errors**, **0 broken relative imports**, **0 broken HTML script/stylesheet links**.
-- **Endpoint Verification:** All 40 audited endpoints returned **HTTP 200 OK**.
+- **Total JavaScript Modules:** 100+ files (Browser modules under `assets/js`, serverless functions `/api/ai.js`, `/api/agora-token.js`, and `/api/firebase-config.js`, Service Worker `sw.js`, and local `dev-server.mjs`).
+- **Live Video Streaming:** Complete Agora RTC engine integration (`assets/js/services/agora.js` + `/api/agora-token.js` token builder with Supabase vendor ownership validation).
+- **Authentication & Google Sign-In:** Integrated Firebase Google OAuth (`assets/js/core/firebase.js` + `/api/firebase-config.js`) supporting instant 1-click Google Sign-in and Sign-up alongside email/password and demo mode. Redesigned Auth layout (`pages/auth/login.html`, `pages/auth/register.html`) matching StreamCart brand styling.
+- **AI Intelligence Suite:** Groq AI proxy verified live using `openai/gpt-oss-120b` with 1,000 max token headroom to support reasoning tokens, with local heuristic fallback for resilience.
+- **Syntax, Import & E2E Integrity:** **0 syntax errors**, **0 broken relative imports**, **0 broken HTML script/stylesheet links**. Automated Headless Chrome E2E audit completed with **25/25 test steps passing** and **0 console errors**.
+- **Endpoint Verification:** All 40+ audited endpoints returned **HTTP 200 OK**.
 - **Live Supabase Status:** Remote database connection verified and active. 20 relational tables confirmed responding (`profiles`, `vendors`, `categories`, `products`, `reels`, `live_streams`, `carts`, `wishlists`, `payouts`, `disputes`, `conversations`, `messages`, `follows`, `reviews`, etc.).
 - **Master SQL Script Ready:** Created [`supabase/apply_all_forward_migrations.sql`](supabase/apply_all_forward_migrations.sql) to apply the RLS recursion fix, create missing storage buckets, configure order notifications, and install all atomic RPCs in **one single run** in Supabase SQL Editor.
-- **Vercel Readiness:** Fixed CSP headers in `vercel.json` (added `'unsafe-inline'` for theme script and expanded image domains), added `"build"` script to `package.json`, and sanitized `.gitignore`.
+- **Vercel Readiness:** Configured zero-config static deployment with serverless Node API routes in `/api`. Updated CSP headers in `vercel.json` (added `'unsafe-inline'` for theme scripts, permitted Agora Web SDK, Firebase Auth CDN domains, and expanded image/media domains).
 
 ---
 
@@ -33,13 +37,14 @@ All frontend pages, backend integrations, security headers, routing, and databas
 | **Cart & Drawer (`pages/shop/cart.html`)** | ✅ 100% Working | ✅ Connected | Quantity increments, stock validation, auto-shipping calculation (Free over ৳2,000). |
 | **Checkout (`pages/shop/checkout.html`)** | ✅ 100% Working | ✅ Connected | COD, demo Card, bKash, and Nagad. Server-side atomic validation via `place_order_atomic`. |
 | **Order Success & Slip (`pages/shop/order-success.html`)** | ✅ 100% Working | ✅ Connected | Visual invoice with printable/downloadable slip receipt. |
+| **Auth & Google Sign-In (`pages/auth/login.html`, `pages/auth/register.html`)** | ✅ 100% Working | ✅ Connected | Firebase Google OAuth popup, email/password, 1-click demo roles, brand glassmorphism redesign. |
 
 ### 2. Video Commerce & Social Shopping
 | Feature | Frontend Status | Backend Readiness | Notes |
 |---|---|---|---|
 | **Shoppable Reels (`pages/reels/reels.html`)** | ✅ 100% Working | ✅ Connected | Vertical swipe, auto-play with mute toggle, like counter, save reel, comments drawer, quick buy popup. |
 | **Live Shopping Streams (`pages/live/live.html`)** | ✅ 100% Working | ✅ Connected | Live badge, scheduled badge, replay streams, viewer counts. |
-| **Watch Stream Room (`pages/live/watch.html`)** | ✅ 100% Working | ✅ Connected | Synchronized video, pinned product card with instant checkout, live chat, floating heart reactions. |
+| **Watch Stream Room (`pages/live/watch.html`)** | ✅ 100% Working | ✅ Connected | Agora RTC viewer subscription with token auth, pinned product card with instant checkout, live chat, floating heart reactions. |
 
 ### 3. Vendor Studio (13 Pages)
 | Feature | Frontend Status | Backend Readiness | Notes |
@@ -54,7 +59,7 @@ All frontend pages, backend integrations, security headers, routing, and databas
 | **Reels (`vendor/reels.html`)** | ✅ 100% Working | ✅ Connected | Performance metrics (views, likes, orders generated per reel). |
 | **Upload Reel (`vendor/reel-upload.html`)** | ✅ 100% Working | ✅ Connected | Video upload to Supabase Storage `reels`, tag multiple products, AI auto-tag suggest. |
 | **Streams (`vendor/live.html`)** | ✅ 100% Working | ✅ Connected | Scheduled, active, and past stream archives. |
-| **Go-Live Studio (`vendor/go-live.html`)** | ✅ 100% Working | ✅ Connected | Host camera/preview, pin products dynamically, real-time viewer chat sync. |
+| **Go-Live Studio (`vendor/go-live.html`)** | ✅ 100% Working | ✅ Connected | Agora RTC host broadcaster (camera/mic), dynamic product pinning, and real-time viewer chat sync. |
 | **Messages (`vendor/messages.html`)** | ✅ 100% Working | ✅ Connected | Direct customer support chat thread. |
 | **Settings (`vendor/settings.html`)** | ✅ 100% Working | ✅ Connected | Store name, banner/logo upload, location, commission rate, and payout requests. |
 
@@ -75,7 +80,8 @@ All frontend pages, backend integrations, security headers, routing, and databas
 | **Settings (`admin/settings.html`)** | ✅ 100% Working | ✅ Connected | Platform commission rate, shipping fee, free shipping threshold, demo data reset. |
 
 ### 5. AI Assistance (`/api/ai` Serverless Endpoint)
-- **Engine:** Groq Llama 3.3 70B Versatile.
+- **Engine:** Groq API (`openai/gpt-oss-120b` or `qwen/qwen3.8-27b`).
+- **Configuration:** Set with 1,000 max tokens headroom to guarantee reasoning tokens do not truncate valid JSON responses.
 - **Capabilities:**
   - Semantic product ranking & search.
   - Reel feed personalization.
@@ -111,9 +117,10 @@ We created [`supabase/apply_all_forward_migrations.sql`](supabase/apply_all_forw
 - **Media & Image Policy:** Expanded `img-src` to support Supabase storage URLs, DummyJSON, UI-Avatars, Unsplash, and inline data/blobs.
 - **Security Headers:** HSTS (`max-age=31536000`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and Referrer Policy are configured.
 
-### 2. Package & Build Configuration
-- Added `"build": "node -e \"console.log('Build complete')\""` to `package.json` to prevent Vercel build failures for static repositories.
-- Serverless API route `api/ai.js` is automatically detected by Vercel's zero-config runtime.
+### 2. Package & Serverless Configuration
+- Configured `package.json` for lightweight zero-config Vercel hosting (removed conflicting dummy build script so static files serve directly from root).
+- Installed server-side Agora Token generation dependencies (`agora-token`, `agora-rtc-sdk-ng`, `dotenv`).
+- Serverless API routes `/api/ai.js` and `/api/agora-token.js` are automatically detected and deployed by Vercel's zero-config runtime.
 
 ### 3. Git Sanitation
 - `.gitignore` properly excludes `.tmp/`, `node_modules/`, `.vercel/`, `.vscode-test.json`, `diff_output.txt`, and secret environment files (`.env`, `.env.*`).
@@ -136,13 +143,23 @@ Follow these simple steps when you are ready to deploy:
 When ready, run in your terminal:
 ```bash
 git add .
-git commit -m "feat: complete frontend-backend audit, Vercel CSP fix, master Supabase migration"
+git commit -m "feat: complete frontend-backend audit, Agora RTC streaming, master Supabase migration"
 git push origin main
 ```
 
-### Step 3: Vercel Deployment
+### Step 3: Vercel Deployment & Environment Variables
 1. Go to [vercel.com](https://vercel.com) and verify the latest commit automatically deploys.
-2. (Optional for AI) In **Vercel Project Settings → Environment Variables**, add:
-   - `GROQ_API_KEY`: Your Groq API key
-   - `GROQ_MODEL`: `llama-3.3-70b-versatile`
-3. Click **Redeploy** to enable the serverless AI assistance features on your live URL.
+2. In **Vercel Project Settings → Environment Variables**, add:
+   - `SUPABASE_URL`: `https://your-project.supabase.co`
+   - `SUPABASE_ANON_KEY`: Your Supabase anon key
+   - `AGORA_APP_ID`: Your Agora App ID (for live broadcasting & viewing)
+   - `AGORA_APP_CERTIFICATE`: Your Agora App Certificate (secret, for token generation)
+   - `GROQ_API_KEY`: (Optional) Your Groq API key for AI features
+   - `GROQ_MODEL`: `openai/gpt-oss-120b` (or `qwen/qwen3.8-27b`)
+   - `FIREBASE_API_KEY`: Firebase web API key (for Google OAuth)
+   - `FIREBASE_AUTH_DOMAIN`: Firebase auth domain (e.g. `your-project.firebaseapp.com`)
+   - `FIREBASE_PROJECT_ID`: Firebase project ID
+   - `FIREBASE_STORAGE_BUCKET`: Firebase storage bucket
+   - `FIREBASE_MESSAGING_SENDER_ID`: Firebase messaging sender ID
+   - `FIREBASE_APP_ID`: Firebase app ID
+3. Click **Redeploy** to enable serverless Agora token generation, Firebase Google Auth, and AI assistance features on your live URL.

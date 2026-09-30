@@ -8,37 +8,37 @@ let activeRequests = 0;
 
 const ACTIONS = {
   'support-chat': {
-    maxTokens: 350,
-    system: 'You are StreamCart, a helpful shopping assistant for a Bangladesh marketplace. Answer in the same language as the user. Be concise and friendly. Do not claim to have looked up orders, issued refunds, created tickets, contacted staff, or performed actions. Do not invent policies or order data. If the question needs account data, tell the user to sign in or use their account page.',
+    maxTokens: 1000,
+    system: 'You are StreamCart, a helpful shopping assistant for a Bangladesh marketplace. Answer in the same language as the user. Be concise and friendly. Do not claim to have looked up orders, issued refunds, created tickets, contacted staff, or performed actions. Do not invent policies or order data. If the question needs account data, tell the user to sign in or use their account page. Return JSON only: {"text":"..."}.',
     user: (input) => `Customer message:\n${input.message}`,
   },
   'rank-products': {
-    maxTokens: 250,
+    maxTokens: 1000,
     system: 'Rank only the supplied product IDs for relevance to the shopper context. Return JSON only: {"ids":["id1",...]} with IDs copied exactly from the candidates. Never invent IDs.',
     user: (input) => `Shopper context: ${input.context || input.query || ''}\nCandidates: ${JSON.stringify(input.products)}`,
   },
   'rank-reels': {
-    maxTokens: 200,
+    maxTokens: 1000,
     system: 'Rank only the supplied reel IDs for relevance to viewer interests. Return JSON only: {"ids":["id1",...]} with IDs copied exactly from the candidates. Never invent IDs.',
     user: (input) => `Viewer interests: ${JSON.stringify(input.interests || {})}\nReels: ${JSON.stringify(input.reels)}`,
   },
   'suggest-tags': {
-    maxTokens: 220,
+    maxTokens: 1000,
     system: 'Select products clearly relevant to the uploaded shoppable video using its caption and filename. Return JSON only: {"ids":["id1",...]} with at most five IDs copied exactly from the supplied products. Never invent IDs.',
     user: (input) => `Caption: ${input.caption || ''}\nFilename: ${input.fileName || ''}\nVendor products: ${JSON.stringify(input.products)}`,
   },
   'product-tags': {
-    maxTokens: 180,
+    maxTokens: 1000,
     system: 'Generate concise search/discovery tags for one e-commerce product using only its supplied facts. Return JSON only: {"tags":["tag",...]}, with 3 to 8 lowercase tags, each at most 30 characters. Do not invent technical specifications.',
     user: (input) => JSON.stringify(input.product),
   },
   'product-description': {
-    maxTokens: 300,
+    maxTokens: 1000,
     system: 'Write a concise, factual e-commerce product description in English. Use only supplied product facts; do not invent specifications, warranty, authenticity, or performance claims. Return JSON only: {"description":"..."}.',
     user: (input) => JSON.stringify(input.product),
   },
   'moderate-reel': {
-    maxTokens: 250,
+    maxTokens: 1000,
     system: 'Review this shopping reel caption and tagged product titles for deceptive, unsafe, prohibited, or unsupported claims. Be conservative and do not infer violations without evidence. Return JSON only: {"score":0-100,"flags":["short reason",...],"summary":"short summary"}. This is decision support, not an automatic moderation decision.',
     user: (input) => `Caption: ${input.caption || ''}\nReported: ${Boolean(input.reported)}\nTagged products: ${JSON.stringify(input.products || [])}`,
   },
@@ -154,10 +154,11 @@ module.exports = async function handler(req, res) {
           { role: 'user', content: definition.user(input) },
         ],
       }),
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {
-      console.error('[AI proxy] Groq request failed:', response.status);
+      const errText = await response.text();
+      console.error('[AI proxy] Groq request failed for action:', action, response.status, errText);
       return send(res, response.status === 429 ? 429 : 502, { error: 'AI provider request failed.' });
     }
     const data = await response.json();

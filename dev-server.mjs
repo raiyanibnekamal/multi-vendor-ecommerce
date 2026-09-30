@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
+import 'dotenv/config';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
@@ -13,10 +15,22 @@ const HOST = '127.0.0.1';
 
 // Load api/ai handler
 let aiHandler = null;
+let agoraTokenHandler = null;
 try {
   aiHandler = require('./api/ai.js');
 } catch (err) {
   console.warn('[Server] Notice: api/ai.js not loaded:', err.message);
+}
+try {
+  agoraTokenHandler = require('./api/agora-token.js');
+} catch (err) {
+  console.warn('[Server] Notice: api/agora-token.js not loaded:', err.message);
+}
+let firebaseConfigHandler = null;
+try {
+  firebaseConfigHandler = require('./api/firebase-config.js');
+} catch (err) {
+  console.warn('[Server] Notice: api/firebase-config.js not loaded:', err.message);
 }
 
 const MIME_TYPES = {
@@ -80,6 +94,51 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ available: false, reason: 'ai_handler_missing' }));
       return;
     }
+  }
+
+  if (pathname === '/api/agora-token' || pathname === '/api/agora-token/') {
+    if (agoraTokenHandler) {
+      res.status = function (statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      };
+      res.json = function (data) {
+        this.setHeader('Content-Type', 'application/json; charset=utf-8');
+        this.end(JSON.stringify(data));
+      };
+      try {
+        await agoraTokenHandler(req, res);
+      } catch (err) {
+        console.error('[Server Agora Error]', err);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Internal server error in Agora token service.' }));
+        }
+      }
+      return;
+    }
+    res.statusCode = 503;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Agora token service is unavailable.' }));
+    return;
+  }
+
+  if (pathname === '/api/firebase-config' || pathname === '/api/firebase-config/') {
+    if (firebaseConfigHandler) {
+      try {
+        firebaseConfigHandler(req, res);
+      } catch (err) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({}));
+    return;
   }
 
   // Static File Serving

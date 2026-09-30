@@ -130,9 +130,18 @@ export async function updateOrderStatus(id, status) {
       status,
       paymentStatus: status === 'cancelled' ? (previous.paymentStatus === 'paid' ? 'refunded' : 'unpaid') : status === 'delivered' ? 'paid' : previous.paymentStatus,
     };
+    const restoreInventory = status === 'cancelled' && previous.status !== 'cancelled';
     order = isLiveAccount
       ? await db.updateAndSync('orders', id, patch)
       : db.updateLocal('orders', id, patch);
+    if (restoreInventory) {
+      previous.items.forEach((item) => {
+        db.updateLocal('products', item.productId, (product) => ({
+          stock: product.stock + item.qty,
+          sold: Math.max(0, product.sold - item.qty),
+        }));
+      });
+    }
   }
   if (!order) throw new Error('Order not found.');
   channel('orders').send('order:update', order, { remote: false });

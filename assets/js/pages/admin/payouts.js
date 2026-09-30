@@ -8,7 +8,7 @@ import { db } from '../../services/db.js';
 import { updatePayoutStatus } from '../../services/vendors.js';
 
 const el = mountDashboard({ role: 'admin', active: 'payouts', title: 'Payouts' });
-let tab = 'requested';
+let tab = 'pending';
 const TABS = ['pending', 'processing', 'paid', 'all'];
 
 function render() {

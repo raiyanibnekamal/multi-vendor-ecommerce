@@ -87,14 +87,16 @@ export async function updatePayoutStatus(payoutId, status) {
     return updateLocalPayoutStatus(payout, status);
   }
 
+  const session = store.get('session');
+  const isLocalDemoAdmin = session?.role === 'admin'
+    && session.email?.toLowerCase() === CONFIG.DEMO_ACCOUNTS.admin.email.toLowerCase()
+    && !UUID_PATTERN.test(session.userId || '');
+  if (isLocalDemoAdmin) return updateLocalPayoutStatus(payout, status);
+
   const supabase = await getSupabase();
   if (!supabase) throw new Error('Payout service is unavailable. Please try again.');
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
-    const session = store.get('session');
-    if (!authError && session && !UUID_PATTERN.test(session.userId || '')) {
-      return updateLocalPayoutStatus(payout, status);
-    }
     throw new Error('Admin authentication is required.');
   }
 

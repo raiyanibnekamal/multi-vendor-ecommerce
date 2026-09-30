@@ -8,12 +8,16 @@ import { SAMPLE_VIDEOS } from '../../services/reels.js';
 import { channel } from '../../services/realtime.js';
 import { db } from '../../services/db.js';
 import { CONFIG } from '../../core/config.js';
+import { connectAgora } from '../../services/agora.js';
 
 const el = mountDashboard({ role: 'vendor', active: 'go-live', title: 'Go live studio' });
 let stream = null;
 let media = null;
 let stopSim = null;
 let timer = null;
+let agoraSession = null;
+let micEnabled = true;
+let cameraEnabled = true;
 const stats = { likes: 0, orders: 0, revenue: 0, peak: 0 };
 
 function myProducts() {
@@ -126,7 +130,7 @@ function addChat(m) {
   box.scrollTop = box.scrollHeight;
 }
 
-function renderStudio() {
+async function renderStudio() {
   const s = streamSync(stream.id);
   const started = new Date(s.startedAt).getTime();
   el.innerHTML = `
@@ -144,7 +148,7 @@ function renderStudio() {
       <div class="stack" style="gap:16px">
         <div class="card" style="overflow:hidden">
           <div style="position:relative;aspect-ratio:16/9;background:#000">
-            <video data-cam playsinline style="width:100%;height:100%;object-fit:cover"></video>
+            <div data-cam class="agora-stage"></div>
             <span class="badge badge-dark" style="position:absolute;left:14px;top:14px" data-cam-note>Connecting…</span>
           </div>
           <div class="card-body row">
@@ -163,7 +167,15 @@ function renderStudio() {
       </div>
     </div>`;
 
-  startCamera($('[data-cam]'), $('[data-cam-note]'));
+  const stage = $('[data-cam]');
+  const cameraNote = $('[data-cam-note]');
+  try {
+    agoraSession = await connectAgora(s.id, 'publisher', stage, { muted: false });
+    cameraNote.textContent = 'Broadcasting to viewers';
+  } catch (error) {
+    cameraNote.textContent = 'Broadcast unavailable';
+    toast(error.message, 'error');
+  }
   timer = setInterval(() => {
     const sec = Math.floor((Date.now() - started) / 1000);
     const pad = (n) => String(n).padStart(2, '0');
@@ -183,7 +195,7 @@ function renderStudio() {
     addChat({ role: 'system', text: `🛒 New order from ${o.customerName} — ${formatPrice(o.total)}` });
     toast(`Live order from ${o.customerName}!`);
   });
-  stopSim = simulateAudience(s.id, {
+  stopSim = CONFIG.USE_MOCK ? simulateAudience(s.id, {
     onChat: addChat,
     onReaction: () => { stats.likes++; $('[data-likes]').textContent = formatNumber(stats.likes); },
     onViewers: (n) => {
@@ -191,7 +203,7 @@ function renderStudio() {
       $('[data-viewers]').textContent = formatNumber(n);
       if (CONFIG.USE_MOCK) db.updateLocal('streams', s.id, { viewers: n });
     },
-  });
+  }) : null;
 
   const reply = async (text) => {
     try {
@@ -210,17 +222,30 @@ function renderStudio() {
       addChat({ role: 'system', text: `📌 Pinned ${db.get('products', b.dataset.pin).title} for viewers` });
     } catch (error) { toast(error.message, 'error'); }
   };
-  $('[data-mic]').onclick = (e) => {
-    const track = media?.getAudioTracks()[0];
-    if (track) track.enabled = !track.enabled;
-    e.currentTarget.innerHTML = track && !track.enabled ? `${icon('mic-off')} Unmute` : `${icon('mic')} Mute`;
+  $('[data-mic]').onclick = async (e) => {
+    micEnabled = !micEnabled;
+    if (agoraSession) await agoraSession.setMicrophoneEnabled(micEnabled);
+    else {
+      const track = media?.getAudioTracks()[0];
+      if (track) track.enabled = micEnabled;
+    }
+    e.currentTarget.innerHTML = micEnabled ? `${icon('mic')} Mute` : `${icon('mic-off')} Unmute`;
   };
-  $('[data-camtoggle]').onclick = () => { const t = media?.getVideoTracks()[0]; if (t) t.enabled = !t.enabled; };
+  $('[data-camtoggle]').onclick = async () => {
+    cameraEnabled = !cameraEnabled;
+    if (agoraSession) await agoraSession.setCameraEnabled(cameraEnabled);
+    else {
+      const track = media?.getVideoTracks()[0];
+      if (track) track.enabled = cameraEnabled;
+    }
+  };
   $('[data-end]').onclick = async () => {
     if (!(await confirmDialog({ title: 'End live stream?', message: 'Viewers will see the stream has ended. A replay will be available.', confirmText: 'End stream', danger: true }))) return;
     const duration = $('[data-dur]').textContent;
     stopSim?.();
     clearInterval(timer);
+    await agoraSession?.close();
+    agoraSession = null;
     stopCamera();
     await endStream(s.id);
     if (CONFIG.USE_MOCK) db.updateLocal('streams', s.id, { peakViewers: stats.peak, likes: (s.likes || 0) + stats.likes });
@@ -242,5 +267,5 @@ if (el) {
   const existing = db.where('streams', (s) => s.vendorId === el.vendor.id && s.status === 'live')[0];
   if (existing) { stream = existing; renderStudio(); }
   else renderSetup();
-  window.addEventListener('beforeunload', () => { stopSim?.(); stopCamera(); });
+  window.addEventListener('beforeunload', () => { stopSim?.(); void agoraSession?.close(); stopCamera(); });
 }

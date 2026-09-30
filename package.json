@@ -5,5 +5,13 @@
   "scripts": {
     "start": "node dev-server.mjs",
     "dev": "node dev-server.mjs"
+  },
+  "dependencies": {
+    "agora-rtc-sdk-ng": "^4.24.8",
+    "agora-token": "^2.0.6",
+    "dotenv": "^18.0.4"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
   }
 }

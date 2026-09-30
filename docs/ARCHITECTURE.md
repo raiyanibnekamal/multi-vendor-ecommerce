@@ -26,13 +26,15 @@ admin/*.html               Admin dashboard (12 pages)
 assets/
   css/   base → layout → components → dashboard → pages/*   (imported by main.css)
   js/
-    core/        config, routes, auth (Supabase bridge + demo session), store, utils, PWA
+    core/        config, routes, auth (Supabase bridge + Firebase Google OAuth + demo session), firebase, store, utils, PWA
     data/        seed rows — one file per future Postgres table
-    services/    db, catalog, cart, orders, reels, live, vendors, userdata, AI, analytics, realtime, storage
+    services/    db, catalog, cart, orders, reels, live/Agora, vendors, userdata, AI, analytics, realtime, storage
     components/  header, footer, shell, dashboardLayout, modal, toast, cards, charts, quickBuy, chatWidget, forms
     pages/       one entry module per HTML page (same path as the HTML file)
-  api/ai.js                  Vercel serverless proxy for Groq requests
   sw.js                      PWA service worker
+api/ai.js                    Vercel serverless proxy for Groq requests
+api/agora-token.js           Vercel/local serverless token issuer
+api/firebase-config.js       Vercel/local serverless public Firebase config provider
 docs/ARCHITECTURE.md
 ```
 
@@ -46,7 +48,7 @@ docs/ARCHITECTURE.md
 
 ## 3. Data and service architecture
 
-`services/db.js` exposes `all / get / where / insert / update / remove`. It initializes from seed data/localStorage and asynchronously hydrates configured tables from Supabase, including clearing stale demo rows when a live query succeeds with no rows. Supabase Auth is used for non-demo accounts; seeded demo accounts remain local. With migrations through 08 applied, live checkout requires the matching authenticated Supabase UUID and calls `place_order_atomic`; the database derives prices, totals, and stock changes in one transaction. Demo orders remain local.
+`services/db.js` exposes local reads plus synchronized writes. It initializes from seed data/localStorage and hydrates configured tables from Supabase for real sessions. Local demo sessions deliberately skip Supabase hydration and keep demo CRUD in browser storage so demo data is not overwritten by anonymous remote reads. Supabase Auth is used for real accounts; demo IDs are stable local identities. With migrations 01-11 applied, live COD checkout requires the matching authenticated Supabase UUID and calls `place_order_atomic`; the database derives prices, totals, and stock changes in one transaction. Online payment choices are mock-only.
 
 The current Supabase project URL and anon/publishable key are configured in `assets/js/core/config.js`. Never put a Supabase service-role key or Groq API key in browser code. Apply migrations through `11_order_payments_notifications.sql` to existing databases before relying on live registration, order, notification, follow, storage, dispute, payout, or stream-message workflows.
 
@@ -103,18 +105,21 @@ Presence (viewer count) is currently simulated/local; production viewer presence
 | `place_order_atomic` (`05_rpc.sql`, hardened by migration 08) | Called by live checkout after migration 08; prices, coupons, shipping, stock locks, order rows, and items are handled in one transaction. |
 | `handle_new_user` (migration 08) | Creates the profile and pending vendor store inside the auth trigger, so email-confirmation signup does not lose the store record. |
 | `checkout`, `payment-webhook` | No payment-provider integration is present. Live checkout permits COD only; online methods are rejected until a provider confirms payment server-side. |
-| `live-token` | Planned. Live video transport is currently sample media/demo simulation. |
+| `/api/agora-token` | Implemented Vercel/local Node endpoint. Verifies real Supabase publisher sessions and approved vendor ownership, then issues short-lived Agora RTC tokens. Local demo publishing is opt-in and refused in production. |
+| `/api/firebase-config` | Implemented Vercel/local Node endpoint. Securely delivers public Firebase Web credentials (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, etc.) from environment variables to client Google OAuth. |
 | `moderate-reel` | Groq review is available on demand as decision support; human moderation remains authoritative. |
 | `request_vendor_payout`, `admin_update_payout_status` (migration 08) | Authenticated RPCs reserve and restore vendor balances transactionally; actual bank/wallet transfer remains a manual external operation. |
 | `admin_resolve_dispute` (migration 08) | Admin-only case/status resolution; refund approval is recorded, but issuing money remains an external/manual operation. |
 
 ---
 
-## 4. Live streaming (Agora / LiveKit)
+## 4. Live streaming (Agora RTC)
 
-- **Video transport** is delegated to Agora or LiveKit (`CONFIG.LIVE_PROVIDER`). The vendor "Go live studio" already captures the camera with `getUserMedia`; in production that `MediaStream` is published via the provider SDK after fetching a token from `live-token`.
-- **Commerce layer stays in Supabase**: stream metadata, pinned product, chat, reactions and orders go over Supabase Realtime, so the video provider can be swapped without touching shopping logic.
-- In the demo, viewers see a sample MP4 and an audience simulator (`simulateAudience`) generates chat, reactions and viewer counts. Vendor actions (pin, host chat) reach viewer tabs in real time.
+- **Video transport:** Agora Web SDK is loaded by `assets/js/services/agora.js`. The vendor studio publishes camera/microphone media; the viewer subscribes to the broadcaster. `/api/agora-token` issues 10-minute tokens. Broadcasters require a valid Supabase session, approved vendor ownership, and a live/scheduled stream; viewer tokens have join-only privileges.
+- **Local demo:** `AGORA_ALLOW_DEMO_PUBLISHER=true` permits only the seeded `v1` demo vendor to publish when not in production. Demo stream state stays in browser storage. Do not enable this flag on Vercel.
+- **Commerce/realtime:** stream metadata is stored in Supabase for real accounts; chat messages use the checked RPC, and pin/status events use Supabase Realtime/Broadcast. Same-browser BroadcastChannel is a local fallback.
+- **Viewer counts:** realtime presence counting is not implemented. Seed counts/demo metrics are not production concurrent-viewer analytics.
+- **Fallback:** if Agora credentials or RTC network access are unavailable, the viewer may display sample/replay media; this is not a live broadcast.
 
 ---
 
@@ -130,7 +135,7 @@ Presence (viewer count) is currently simulated/local; production viewer presence
 | Support chat | Local account/order/policy intents first; Groq handles general questions without access to private order tools. |
 | Moderation | Local heuristics plus optional on-demand Groq decision support; it does not automatically approve/reject reels. |
 
-The browser calls only the same-origin `/api/ai` endpoint. When configured, `GROQ_API_KEY` is read from the Vercel server environment and is never sent to the client. Deployment environment values are not verifiable from this repository. Without the key/function, the app falls back to local behavior.
+The browser calls only the same-origin `/api/ai` endpoint. When configured, `GROQ_API_KEY` is read from the server environment (`dev-server.mjs` / Vercel) and is never sent to the client. The default model is configured as `openai/gpt-oss-120b` (or `qwen/qwen3.8-27b`) with 1,000 max tokens headroom so reasoning output does not truncate valid JSON. Without the key/function, the app falls back to local heuristic behavior.
 
 ---
 
@@ -150,7 +155,7 @@ The browser calls only the same-origin `/api/ai` endpoint. When configured, `GRO
 
 ## 7. Backend readiness and deployment notes
 
-The following diagrams and tables describe the backend boundary, not a claim that every production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations in order through `10_production_security_hardening.sql`; the frontend does not run database migrations automatically.
+The following diagrams and tables describe the backend boundary, not a claim that every external production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations 01-11 in order; the frontend does not run database migrations automatically.
 
 ### 7.1 Architecture & Component Map
 
@@ -158,32 +163,27 @@ The following diagrams and tables describe the backend boundary, not a claim tha
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        Client Layer (Vercel)                           │
 │  Storefront  │  Reels  │  Live Studio  │  Vendor Dash  │  Admin Dash   │
-└───────────────────────────┬────────────────────────────────────────────┘
-                            │
-              @supabase/supabase-js (Browser SDK)
-                            │
-┌───────────────────────────▼────────────────────────────────────────────┐
-│                    Supabase Backend (Free Tier)                         │
-├───────────────────────────┬────────────────────────────────────────────┤
-│ 1. Supabase Auth          │ Email/password + Role metadata             │
-│                           │ Trigger creates public.profiles automatically│
-├───────────────────────────┼────────────────────────────────────────────┤
-│ 2. PostgreSQL (v15+)      │ 20+ Normalized relational tables           │
-│                           │ Check constraints & Foreign key cascades   │
-├───────────────────────────┼────────────────────────────────────────────┤
-│ 3. Row Level Security     │ Role/vendor policies defined in migrations │
-│                           │ Verify deployed policy state before launch  │
-├───────────────────────────┼────────────────────────────────────────────┤
-│ 4. Stored Procedures(RPC) │ SQL RPCs defined; checkout not wired to RPC │
-│                           │ Vendor Balance & Payout calculation        │
-│                           │ Live Stream Product Pinning & Metrics      │
-├───────────────────────────┼────────────────────────────────────────────┤
-│ 5. Supabase Realtime      │ Broadcast: Live chat, reactions, pin card  │
-│                           │ Postgres Changes: Orders & Vendor alerts   │
-├───────────────────────────┼────────────────────────────────────────────┤
-│ 6. Supabase Storage       │ Buckets: product-images, reels, avatars    │
-│                           │ Public read + Vendor-authenticated write   │
-└────────────────────────────────────────────────────────────────────────┘
+│  Auth (Login / Register / Firebase Google OAuth / Demo Switcher)       │
+└─────────────┬────────────────────────────────────────────┬─────────────┘
+              │                                            │
+@supabase/supabase-js (Browser SDK)          Firebase Auth SDK & API Proxy
+              │                                            │
+┌─────────────▼────────────────────────────┐ ┌─────────────▼─────────────┐
+│    Supabase Backend (Free Tier)          │ │ Serverless API Endpoints  │
+├──────────────────────────┬───────────────┤ ├───────────────────────────┤
+│ 1. Supabase Auth         │ Email/password│ │ /api/ai                   │
+│                          │ + Profile sync│ │   Groq reasoning proxy    │
+├──────────────────────────┼───────────────┤ │ /api/agora-token          │
+│ 2. PostgreSQL (v15+)     │ 20+ Tables    │ │   Agora RTC token minter  │
+├──────────────────────────┼───────────────┤ │ /api/firebase-config      │
+│ 3. Row Level Security    │ Role policies │ │   Public Firebase config  │
+├──────────────────────────┼───────────────┤ └───────────────────────────┘
+│ 4. Stored Procedures(RPC)│ Atomic flows  │
+├──────────────────────────┼───────────────┤
+│ 5. Supabase Realtime     │ Broadcast/sync│
+├──────────────────────────┼───────────────┤
+│ 6. Supabase Storage      │ 3 Buckets     │
+└──────────────────────────┴───────────────┘
 ```
 
 ### 7.2 Core Database Entities (20+ Tables)
@@ -247,4 +247,7 @@ This matrix summarizes source and migration intent, not a live database attestat
 - [x] **Phase 9: Supabase Auth, Storage, Realtime and Groq AI proxy integration** (source implemented; production env/migrations still require deployment configuration)
 - [x] **Phase 10: Production security hardening** (`10_production_security_hardening.sql`, safe media URL handling, and deployment security headers; hosted migration state still requires verification)
 - [x] **Phase 11: Order payment and notification foundation** (`11_order_payments_notifications.sql`, secure mock payment wrapper, persisted notifications, realtime updates, and downloadable order receipts)
+- [x] **Phase 12: Real-time Live Video Streaming** (Agora RTC Web SDK integration `assets/js/services/agora.js`, serverless token issuer `/api/agora-token.js`, vendor broadcaster studio, and subscriber audience room)
+- [x] **Phase 13: Firebase Google Authentication & Brand Auth Redesign** (Modular Firebase client integration `assets/js/core/firebase.js`, `/api/firebase-config.js` public config provider, Supabase profile auto-sync, 1-click Google OAuth popup, and modernized glassmorphic login/register UI)
+- [x] **Phase 14: Comprehensive E2E Headless Verification & AI Reasoning Headroom** (25/25 automated test steps passing across Storefront, Cart, Catalog, Customer, Vendor, Admin flows with 0 console errors; Groq AI `openai/gpt-oss-120b` configured with 1,000 max tokens headroom for reasoning output)
 

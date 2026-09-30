@@ -6,6 +6,7 @@ import { getSupabase } from './supabase.js?v=20260928-11';
 import { routes, dashboardFor } from './routes.js';
 import { db, respond } from '../services/db.js';
 import { uid } from './utils.js';
+import { signInWithGooglePopup } from './firebase.js';
 
 export function getSession() {
   const session = store.get('session');
@@ -216,14 +217,42 @@ function fallbackDemoUser(email, role) {
   const demo = CONFIG.DEMO_ACCOUNTS[role];
   if (!demo) return null;
   return {
-    id: uid('u'),
-    name: role === 'admin' ? 'Platform Admin' : role === 'vendor' ? 'Vendor Demo' : 'Customer Demo',
+    id: demo.id || uid('u'),
+    name: demo.name || (role === 'admin' ? 'Platform Admin' : role === 'vendor' ? 'Vendor Demo' : 'Customer Demo'),
     email: normalizedEmail,
     password: demo.password,
     role,
     status: 'active',
     joinedAt: new Date().toISOString(),
   };
+}
+
+function persistDemoIdentity(user, demoAccount, role) {
+  const email = demoAccount.email.toLowerCase();
+  const matches = db.all('users').filter((candidate) => candidate.email?.toLowerCase() === email);
+  const previousIds = new Set(matches.map((candidate) => candidate.id).filter(Boolean));
+  if (user.id) previousIds.add(user.id);
+
+  const canonical = {
+    ...user,
+    id: demoAccount.id || user.id,
+    name: demoAccount.name || user.name,
+    email,
+    role,
+    password: demoAccount.password,
+  };
+  const existing = matches.find((candidate) => candidate.id === canonical.id) || matches[0];
+  if (existing) db.updateLocal('users', existing.id, { ...existing, ...canonical });
+  else db.insertLocal('users', canonical);
+
+  if (role === 'customer') {
+    db.all('orders')
+      .filter((order) => !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(order.customerId || '')
+        && (previousIds.has(order.customerId) || order.customerName === canonical.name))
+      .forEach((order) => db.updateLocal('orders', order.id, { customerId: canonical.id, customerName: canonical.name }));
+  }
+
+  return canonical;
 }
 
 function isDemoAccount(email) {
@@ -266,6 +295,7 @@ export async function login(email, password) {
     if (demoUser.status === 'blocked') throw new Error('This account has been suspended. Contact support.');
 
     const canonicalUser = pickCanonicalUser(demoUser);
+    if (demoAccount) return startSession(persistDemoIdentity(canonicalUser, demoAccount[1], demoAccount[0]));
     const existingUser = db.all('users').find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
     if (existingUser && existingUser.id !== canonicalUser.id) {
       db.updateLocal('users', existingUser.id, { ...existingUser, ...canonicalUser, id: existingUser.id, email: existingUser.email || canonicalUser.email, vendorId: existingUser.vendorId || canonicalUser.vendorId || null });
@@ -430,4 +460,49 @@ export function requireRole(...roles) {
     return null;
   }
   return user;
+}
+
+export async function loginWithGoogle(requestedRole = 'customer') {
+  const gUser = await signInWithGooglePopup();
+  if (!gUser || !gUser.email) throw new Error('Could not retrieve your Google account details.');
+
+  const email = gUser.email.toLowerCase().trim();
+  const existing = db.all('users').find((u) => u.email?.toLowerCase() === email);
+
+  const mappedUser = {
+    id: existing?.id || gUser.uid || uid('u'),
+    name: gUser.displayName || existing?.name || email.split('@')[0],
+    email,
+    role: existing?.role || requestedRole || 'customer',
+    vendorId: existing?.vendorId || null,
+    avatar: gUser.photoURL || existing?.avatar || '',
+    phone: gUser.phoneNumber || existing?.phone || '',
+    status: 'active',
+    addresses: existing?.addresses || [],
+    joinedAt: existing?.joinedAt || new Date().toISOString(),
+    authProvider: 'google',
+  };
+
+  const signedIn = startSession(mappedUser);
+
+  if (!CONFIG.USE_MOCK) {
+    getSupabase().then(async (supabase) => {
+      if (!supabase) return;
+      try {
+        await supabase.from('profiles').upsert({
+          id: signedIn.id,
+          name: signedIn.name,
+          email: signedIn.email,
+          role: signedIn.role,
+          phone: signedIn.phone,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('[Google Auth] Supabase profile sync notice:', e.message);
+      }
+    });
+  }
+
+  return signedIn;
 }

@@ -36,6 +36,13 @@ export function streamSync(id) {
   return normalizeStream(db.get('streams', id));
 }
 
+function isLocalDemoVendor(vendorId) {
+  const user = currentUser();
+  return user?.email?.toLowerCase() === CONFIG.DEMO_ACCOUNTS.vendor.email
+    && user.vendorId === vendorId
+    && !UUID_PATTERN.test(user.id);
+}
+
 export async function getStream(id) {
   await db.waitForInitialSync();
   return respond(streamSync(id));
@@ -70,12 +77,17 @@ export async function scheduleStream({ vendorId, title, scheduledAt, productIds,
     id: uid('s'), vendorId, title, status: 'scheduled', categoryId, productIds, pinnedProductId: productIds[0] || null,
     videoUrl: null, thumbnail, viewers: 0, peakViewers: 0, likes: 0, startedAt: null, scheduledAt, status_moderation: 'ok',
   };
-  await db.insertAndSync('streams', s);
+  if (isLocalDemoVendor(vendorId)) db.insertLocal('streams', s);
+  else await db.insertAndSync('streams', s);
   return respond(s);
 }
 
 export async function startStream(id) {
-  const s = await db.updateAndSync('streams', id, { status: 'live', startedAt: new Date().toISOString(), viewers: 0 });
+  const current = db.get('streams', id);
+  const patch = { status: 'live', startedAt: new Date().toISOString(), viewers: 0 };
+  const s = isLocalDemoVendor(current?.vendorId)
+    ? db.updateLocal('streams', id, patch)
+    : await db.updateAndSync('streams', id, patch);
   streamChannel(id).send('status', 'live', { remote: false });
   return respond(s);
 }
@@ -83,17 +95,26 @@ export async function startStream(id) {
 export async function endStream(id) {
   const current = db.get('streams', id);
   if (!current) throw new Error('Stream not found.');
-  const s = await db.updateAndSync('streams', id, { status: 'ended', peakViewers: Math.max(current.peakViewers || 0, current.viewers || 0), viewers: 0 });
+  const patch = { status: 'ended', peakViewers: Math.max(current.peakViewers || 0, current.viewers || 0), viewers: 0 };
+  const s = isLocalDemoVendor(current.vendorId)
+    ? db.updateLocal('streams', id, patch)
+    : await db.updateAndSync('streams', id, patch);
   streamChannel(id).send('status', 'ended', { remote: false });
   return respond(s);
 }
 
 export async function updateStream(id, patch) {
-  return respond(await db.updateAndSync('streams', id, patch));
+  const current = db.get('streams', id);
+  const updated = isLocalDemoVendor(current?.vendorId)
+    ? db.updateLocal('streams', id, patch)
+    : await db.updateAndSync('streams', id, patch);
+  return respond(updated);
 }
 
 export async function pinProduct(streamId, productId) {
-  await db.updateAndSync('streams', streamId, { pinnedProductId: productId });
+  const current = db.get('streams', streamId);
+  if (isLocalDemoVendor(current?.vendorId)) db.updateLocal('streams', streamId, { pinnedProductId: productId });
+  else await db.updateAndSync('streams', streamId, { pinnedProductId: productId });
   streamChannel(streamId).send('pin', productId, { remote: false });
 }
 

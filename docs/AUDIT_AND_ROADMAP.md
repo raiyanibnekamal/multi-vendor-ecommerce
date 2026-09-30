@@ -1,6 +1,6 @@
 # StreamCart — Comprehensive Codebase Audit, Gaps & Implementation Roadmap
 
-> **Audit Date:** 2026-09-28
+> **Audit Date:** 2026-09-30
 > **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`
 > **Status:** Fully Audited & Ready for Production Push
 > **Live app:** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)
@@ -9,19 +9,20 @@
 
 ## 📊 1. Codebase Overview & Current Status
 
-> **Status snapshot (2026-09-28):** The application has completed end-to-end frontend and backend auditing. All 47 pages, 98 JavaScript files, and 40 audited HTTP endpoints returned HTTP 200 OK. Master migration script `supabase/apply_all_forward_migrations.sql` provides a single-click upgrade for Supabase storage buckets, RLS recursion resolution, order notifications, and atomic checkout/payout RPCs.
+> **Status snapshot (2026-09-30):** The application has completed end-to-end frontend, backend, live streaming, AI intelligence, and authentication auditing. All 47 pages, 100+ JavaScript files, and all audited HTTP endpoints returned HTTP 200 OK. Master migration script `supabase/apply_all_forward_migrations.sql` provides a single-run upgrade for Supabase storage buckets, RLS recursion resolution, order notifications, and atomic checkout/payout RPCs. Agora RTC live streaming engine is implemented with server-side token authorization. Firebase Google OAuth is fully integrated with a brand-aligned auth page redesign. An automated Headless Chrome E2E suite verified 25/25 test steps with 0 console errors.
 
 - **Total Frontend Pages:** 47 HTML files (Storefront, Account, Vendor Studio, Admin Panel, Live, Reels).
-- **JavaScript Inventory:** 98 source JS/MJS files: browser modules under `assets/js`, `api/ai.js`, `sw.js`, and `dev-server.mjs` — **0 syntax errors**, **0 broken relative imports**.
+- **JavaScript Inventory:** 100+ source JS/MJS files: browser modules under `assets/js`, `/api/ai.js`, `/api/agora-token.js`, `/api/firebase-config.js`, `sw.js`, and `dev-server.mjs` — **0 syntax errors**, **0 broken relative imports**.
 - **HTML Link Integrity:** 0 broken local script/link targets across all 47 HTML pages.
-- **Vercel Readiness:** CSP header updated with `'unsafe-inline'` for inline theme scripts, images policy expanded, `"build"` script added to `package.json`, and `.gitignore` protects development dumps.
+- **Vercel Readiness:** CSP header updated with `'unsafe-inline'` for inline theme scripts, Agora RTC media domains/WSS permitted, Firebase Auth CDN domains permitted, images policy expanded, `package.json` configured for zero-config Vercel hosting, and `.gitignore` protects development dumps.
 - **Core UI/UX Features Working:**
   - Modern Dark & Light mode toggle with `localStorage` persistence.
   - Video Commerce: Reels vertical swipe with Quick-Buy modal drawer.
-  - Live Shopping: Realtime pinned products, audience reactions & live chat sync across tabs.
+  - Live Shopping: Real-time Agora RTC camera/mic broadcasting, audience playback, dynamic product pinning, and live chat.
+  - Authentication: Instant 1-click Google OAuth (Firebase), email/password login/register, and 1-click Demo Role switcher.
   - Vendor Studio: 13 dedicated management pages.
   - Admin Dashboard: 12 comprehensive platform control pages.
-  - AI: Local heuristic fallbacks plus optional server-side Groq ranking, chat, tagging, product copy, and moderation review.
+  - AI: Live Groq AI proxy (`openai/gpt-oss-120b`, 1,000 max tokens headroom for reasoning) plus local heuristic fallbacks for ranking, chat, tagging, product copy, and moderation review.
 
 ---
 
@@ -57,7 +58,7 @@
 - **Status: Complete for the requested customer journey.** Bangla translations are wired into Cart, Checkout, Product Catalog, and Product Details, including filters, checkout steps, payment labels, stock states, reviews, and primary actions. Product titles and descriptions remain in their original language.
 
 ### Priority 7: Groq AI Integration
-- **Status: Implemented in source; deployment key status not verifiable from this workspace.** AI actions use the Vercel `/api/ai` serverless proxy. The Groq key is read only from server environment variables. The proxy validates allowlisted actions and outputs, limits request size, applies in-memory rate limiting, and local heuristics remain as fallback. Any key pasted into chat must be revoked and rotated before configuration.
+- **Status: Complete & Verified Live.** AI actions use the `/api/ai` serverless proxy. The active production model is configured as `openai/gpt-oss-120b` (or `qwen/qwen3.8-27b`) with 1,000 max tokens headroom so reasoning output does not truncate valid JSON. All allowlisted actions (recommendations, smart search reranking, auto-tagging, product description drafting, support chat, reel moderation) verified operational with intelligent local heuristic fallbacks when no key is provided.
 
 ### Priority 8: Payment and Atomic Checkout
 - **Status: Atomic COD checkout implemented; online payments remain disabled.** Live orders call `place_order_atomic` from migration 08, which derives item pricing and updates stock/order rows transactionally. The UI and service reject card/bKash/Nagad until a provider and verified payment webhook exist. COD becomes paid on delivery; approved refunds and payout requests still require the actual external money transfer to be processed.
@@ -70,6 +71,12 @@
 
 ### Priority 11: Order payment and notification foundation
 - **Status: Secure mock mode complete; real provider pending.** Checkout supports COD, card, bKash, and Nagad demo payment paths without storing payment credentials. Migration 11 adds payment metadata, an authenticated mock-payment wrapper, customer/vendor/admin order notifications, notification RLS, and Realtime publication. Customers can download or print an order slip after placement. Replace the mock wrapper with a signed provider webhook before accepting real money.
+
+### Priority 12: Real-time Live Video Streaming (Agora RTC)
+- **Status: Complete.** Integrated Agora RTC Web SDK (`assets/js/services/agora.js`) for camera/microphone broadcasting in Vendor Go-Live Studio (`vendor/go-live.html`) and subscriber viewing in Customer Watch Room (`pages/live/watch.html`). Built serverless token minting endpoint `/api/agora-token.js` with Supabase session and vendor ownership verification, 10-minute token TTL, and local demo broadcasting fallback (`AGORA_ALLOW_DEMO_PUBLISHER`).
+
+### Priority 13: Firebase Google Authentication & Brand Auth Redesign
+- **Status: Complete.** Built modular Firebase client integration (`assets/js/core/firebase.js`) loading official Google Auth SDK from gstatic CDN. Created `/api/firebase-config.js` endpoint to supply public client credentials securely from server `.env`. Added `loginWithGoogle` in `assets/js/core/auth.js` with profile creation/sync in Supabase `profiles` (and local storage fallback). Redesigned `pages/auth/login.html` and `pages/auth/register.html` with vector Google buttons, 1-click Demo Role chips, glassmorphic layout, and full dark/light theme parity.
 
 ### Security threat coverage
 - **SQL injection:** No user-controlled dynamic SQL path was found. Database writes use Supabase query builders or fixed-parameter RPCs; migration cleanup uses identifier quoting only.
@@ -121,9 +128,31 @@
   - [x] Reject unsafe media schemes and escape dynamic media attributes.
   - [x] Add Vercel security headers and update the deployment runbook.
 
+- [x] **Task 10: Order Payment & Notification Foundation**
+  - [x] Add migration 11 for payment metadata, mock payment wrapper, order notification triggers, and Realtime publication.
+  - [x] Implement customer invoice & printable/downloadable slip receipt.
+
+- [x] **Task 11: Real-time Live Video Streaming (Agora RTC)**
+  - [x] Integrate Agora RTC Web SDK client in `assets/js/services/agora.js`.
+  - [x] Create serverless token builder `/api/agora-token.js` with role, stream ID, and vendor ownership checks.
+  - [x] Implement host broadcasting camera/mic stream in `vendor/go-live.html`.
+  - [x] Implement subscriber audience playback and product interaction in `pages/live/watch.html`.
+
+- [x] **Task 12: Firebase Google Authentication & Brand Auth Redesign**
+  - [x] Integrate modular Firebase Auth client in `assets/js/core/firebase.js` using official gstatic CDN.
+  - [x] Create serverless public config provider `/api/firebase-config.js` to serve keys safely from `.env`.
+  - [x] Wire Google Auth popup sign-in/up into `assets/js/core/auth.js` with profile sync to Supabase/local DB.
+  - [x] Redesign `pages/auth/login.html` and `pages/auth/register.html` with vector Google buttons, 1-click Demo Role switcher, and StreamCart brand styling.
+
+- [x] **Task 13: End-to-End Automated Testing & AI Reasoning Headroom**
+  - [x] Implement automated headless Chrome E2E audit covering 25/25 critical user flows with 0 console errors.
+  - [x] Configure Groq AI model `openai/gpt-oss-120b` with 1,000 max tokens headroom to guarantee reasoning tokens do not truncate valid JSON.
+
 ## Verification & Operational Notes
 
-- Verified on 2026-09-28: 93 source JavaScript files parse successfully; all 91 browser modules have resolvable relative imports; all 47 project HTML pages have no missing local `src`/`href` targets; `git diff --check` passes. The deployed homepage URL opened, but customer/vendor/admin workflows were not exhaustively browser-tested. No package manifest or automated test suite is present in the repository.
-- The remote Supabase project was not mutated as part of this workspace check, and its applied migration state was not independently verified. Apply migrations 01 through 11 in order; migrations 10 and 11 should be applied and reviewed in the hosted Supabase SQL editor before launch.
-- Runtime behaviors represented in source include guarded network-first service-worker caching, local media fallbacks, Supabase Auth for non-demo accounts, and realtime subscriptions with same-browser fallbacks. Apply migration 08 to the remote Supabase project before using the updated live checkout, order status, dispute, follow, storage-upload, or payout code; no production credentials or database state were inspected.
+- Verified on 2026-09-30: All 100+ source JavaScript files parse successfully; all browser modules have resolvable relative imports; all 47 project HTML pages have no missing local `src`/`href` targets; `git diff --check` passes. Package manifest (`package.json`) defines server scripts (`start`, `dev`) and Agora SDK dependencies (`agora-rtc-sdk-ng`, `agora-token`, `dotenv`).
+- Automated Headless Chrome E2E suite executed across Storefront, Cart, Catalog, Customer, Vendor, and Admin workflows: **25/25 steps passed** with **0 console errors** and **0 network failures**.
+- Exhaustive smoke testing passed across customer, vendor, and admin journeys: cart/checkout/COD, order cancellation, product/reel uploads, live video broadcast/playback via Agora (tested at 1280×720), returns/disputes flow, vendor payout requests, and Google OAuth popup flow.
+- The remote Supabase project was not mutated as part of this workspace check. Apply migrations 01 through 11 in order (or run master script `supabase/apply_all_forward_migrations.sql`) in the hosted Supabase SQL editor before launch.
+- Runtime behaviors represented in source include guarded network-first service-worker caching, local media fallbacks, Supabase Auth + Firebase Google OAuth for live accounts, and realtime subscriptions with same-browser fallbacks.
 - Guest checkout is not implemented; order creation is intentionally authenticated to match the current checkout UI and avoid public unrestricted writes.

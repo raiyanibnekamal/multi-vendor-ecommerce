@@ -12,11 +12,14 @@ import { currentUser } from '../../core/auth.js';
 import { toggleInList, inList } from '../../services/userdata.js';
 import { track } from '../../services/ai.js';
 import { db } from '../../services/db.js';
+import { connectAgora } from '../../services/agora.js';
+import { CONFIG } from '../../core/config.js';
 
 document.body.classList.add('watch-page');
 const main = mountShell({ active: 'live', footer: false, chat: false });
 const id = qs('id');
 let stopSim = null;
+let agoraSession = null;
 let muted = true;
 
 function pinnedHtml(s) {
@@ -76,7 +79,7 @@ async function render() {
   <div class="watch">
     <div class="watch-left">
       <div class="player">
-        <video src="${s.videoUrl || SAMPLE_VIDEOS[1]}" poster="${s.thumbnail}" ${s.status !== 'scheduled' ? 'autoplay' : ''} muted loop playsinline></video>
+          ${s.status === 'live' ? '<div class="agora-viewer-stage" data-agora-video></div>' : `<video src="${s.videoUrl || SAMPLE_VIDEOS[1]}" poster="${s.thumbnail}" ${s.status !== 'scheduled' ? 'autoplay' : ''} muted loop playsinline></video>`}
         <div class="shade"></div>
         <div class="player-top">
           ${statusBadge}
@@ -117,7 +120,24 @@ async function render() {
   </div>`;
 
   bind(s, v);
-  if (s.status === 'live') startRealtime(s);
+  if (s.status === 'live') {
+    const stage = $('[data-agora-video]');
+    try {
+      agoraSession = await connectAgora(s.id, 'subscriber', stage, { muted });
+    } catch (error) {
+      const fallback = document.createElement('video');
+      fallback.src = s.videoUrl || SAMPLE_VIDEOS[1];
+      fallback.poster = s.thumbnail || '';
+      fallback.autoplay = true;
+      fallback.muted = true;
+      fallback.loop = true;
+      fallback.playsInline = true;
+      stage.replaceChildren(fallback);
+      fallback.play().catch(() => {});
+      toast(`${error.message} Showing the replay preview instead.`, 'error');
+    }
+    startRealtime(s);
+  }
   chatHistory.forEach(addChat);
   if (s.status === 'ended' && !chatHistory.length) replayChat();
   if (s.status === 'scheduled') {
@@ -176,12 +196,12 @@ function startRealtime(s) {
     .on('reaction', floatReaction)
     .on('pin', updatePinned)
     .on('status', (st) => { if (st === 'ended') { toast('The stream has ended', 'info'); setTimeout(render, 800); } });
-  stopSim = simulateAudience(s.id, {
+  stopSim = CONFIG.USE_MOCK ? simulateAudience(s.id, {
     onChat: addChat,
     onReaction: floatReaction,
     onViewers: (n) => { const el = $('[data-viewers]'); if (el) el.textContent = formatNumber(n); },
     onPurchase: (name) => { const p = db.get('products', streamSync(s.id).pinnedProductId); if (p) showBuyPop(name, p.title); },
-  });
+  }) : null;
 }
 
 function replayChat() {
@@ -191,7 +211,12 @@ function replayChat() {
 
 function bind(s, v) {
   const video = $('.player video');
-  $('[data-mute]').onclick = (e) => { muted = !muted; video.muted = muted; e.currentTarget.innerHTML = icon(muted ? 'volume-x' : 'volume-2'); };
+  $('[data-mute]').onclick = (e) => {
+    muted = !muted;
+    if (video) video.muted = muted;
+    void agoraSession?.setMuted(muted);
+    e.currentTarget.innerHTML = icon(muted ? 'volume-x' : 'volume-2');
+  };
   $('[data-share]').onclick = async () => { await navigator.clipboard?.writeText(location.href).catch(() => {}); toast('Stream link copied', 'info'); };
   $('[data-follow]').onclick = async (e) => {
     const btn = e.currentTarget;
@@ -241,5 +266,5 @@ main.addEventListener('click', (e) => {
     onDone: () => { void sendChat(id, { role: 'system', text: `🎉 ${currentUser()?.name.split(' ')[0]} just placed an order!` }).catch((error) => toast(error.message, 'error')); },
   });
 });
-window.addEventListener('beforeunload', () => stopSim?.());
+window.addEventListener('beforeunload', () => { stopSim?.(); void agoraSession?.close(); });
 render();

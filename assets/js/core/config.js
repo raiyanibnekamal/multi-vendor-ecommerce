@@ -17,8 +17,17 @@ export const CONFIG = {
   STORAGE_PREFIX: 'sc_',
 
   DEMO_ACCOUNTS: {
-    admin: { email: 'admin@demo.com', password: 'demo123' },
-    vendor: { email: 'vendor@demo.com', password: 'demo123' },
-    customer: { email: 'customer@demo.com', password: 'demo123' },
+    admin: { id: 'u-admin', name: 'Platform Admin', email: 'admin@demo.com', password: 'demo123' },
+    vendor: { id: 'u-v1', name: 'Tanvir Ahmed', email: 'vendor@demo.com', password: 'demo123' },
+    customer: { id: 'c1', name: 'Customer Demo', email: 'customer@demo.com', password: 'demo123' },
+  },
+
+  FIREBASE: {
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: '',
   },
 };
