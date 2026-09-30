@@ -32,6 +32,12 @@ try {
 } catch (err) {
   console.warn('[Server] Notice: api/firebase-config.js not loaded:', err.message);
 }
+let imageHandler = null;
+try {
+  imageHandler = require('./api/image.js');
+} catch (err) {
+  console.warn('[Server] Notice: api/image.js not loaded:', err.message);
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -139,6 +145,30 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({}));
     return;
+  }
+
+  if (pathname === '/api/image' || pathname === '/api/image/') {
+    if (imageHandler) {
+      req.query = Object.fromEntries(parsedUrl.searchParams.entries());
+      res.status = function (statusCode) {
+        this.statusCode = statusCode;
+        return this;
+      };
+      res.json = function (data) {
+        this.setHeader('Content-Type', 'application/json; charset=utf-8');
+        this.end(JSON.stringify(data));
+      };
+      try {
+        await imageHandler(req, res);
+      } catch (err) {
+        console.error('[Server Image Proxy Error]', err);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.end('Proxy error');
+        }
+      }
+      return;
+    }
   }
 
   // Static File Serving

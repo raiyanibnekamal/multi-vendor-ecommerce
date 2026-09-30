@@ -23,14 +23,21 @@ export function installInterceptors() {
     if (target && target !== window && target.tagName) {
       const tag = target.tagName.toLowerCase();
       const url = target.src || target.href || target.currentSrc || 'unknown URL';
-      addLog({
-        type: 'resource',
-        source: `<${tag}> Resource Error`,
-        message: `Failed to load asset: <${tag}> from "${url}"`,
-        location: url,
-        time: new Date().toLocaleTimeString(),
-        suggestion: `Verify that the file exists at this path, the CDN is online, and CORS permits loading.`
-      });
+      // Wait 150ms to check if an inline fallback or onerror self-heals the element
+      setTimeout(() => {
+        if (tag === 'img' && (target.naturalWidth > 0 || (target.complete && target.currentSrc && target.currentSrc !== url))) {
+          // Image self-healed via fallback, do not spam console with fatal error
+          return;
+        }
+        addLog({
+          type: 'resource',
+          source: `<${tag}> Resource Error`,
+          message: `Failed to load asset: <${tag}> from "${url}"`,
+          location: url,
+          time: new Date().toLocaleTimeString(),
+          suggestion: `Verify that the file exists at this path, the CDN is online, and CORS permits loading.`
+        });
+      }, 150);
       return;
     }
 

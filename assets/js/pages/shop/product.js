@@ -3,7 +3,7 @@ import { productCard, reelThumb, liveCard, priceHtml, emptyState, loading } from
 import { openModal, ensureLogin } from '../../components/modal.js';
 import { toast } from '../../components/toast.js';
 import { routes } from '../../core/routes.js';
-import { escapeHtml, icon, qs, $, $$, formatNumber, stars, avatar, timeAgo, uid } from '../../core/utils.js';
+import { escapeHtml, icon, qs, $, $$, formatNumber, stars, avatar, timeAgo, uid, safeMediaUrl } from '../../core/utils.js';
 import { getProduct, getRelated, getReviews, addReview, categoryPath } from '../../services/catalog.js';
 import { vendorSync, isFollowing, toggleFollow } from '../../services/vendors.js';
 import { reelsForProduct } from '../../services/reels.js';
@@ -29,7 +29,8 @@ async function render() {
   const path = categoryPath(p.categoryId);
   const reels = reelsForProduct(p.id);
   const streams = db.where('streams', (s) => s.status !== 'ended' && Array.isArray(s.productIds) && s.productIds.includes(p.id));
-  const images = p.images.length ? p.images : [p.thumbnail];
+  const rawImages = p.images?.length ? p.images : [p.thumbnail];
+  const images = rawImages.map((src) => safeMediaUrl(src, p.title));
 
   main.innerHTML = `
   <div class="container page">
@@ -37,9 +38,9 @@ async function render() {
 
     <div class="pdp">
       <div class="gallery">
-        <div class="gallery-thumbs">${images.map((src, i) => `<button class="${i === 0 ? 'active' : ''}" data-img="${src}"><img src="${src}" alt=""></button>`).join('')}</div>
+        <div class="gallery-thumbs">${images.map((src, i) => `<button class="${i === 0 ? 'active' : ''}" data-img="${escapeHtml(src)}"><img src="${escapeHtml(src)}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'"></button>`).join('')}</div>
         <div class="gallery-main">
-          <img src="${images[0]}" alt="${escapeHtml(p.title)}" data-main-img>
+          <img src="${escapeHtml(images[0])}" alt="${escapeHtml(p.title)}" data-main-img onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'">
           ${p.discount >= 5 ? `<span class="badge badge-sale" style="position:absolute;top:14px;left:14px">-${p.discount}%</span>` : ''}
         </div>
       </div>

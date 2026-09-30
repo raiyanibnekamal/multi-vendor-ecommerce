@@ -2,7 +2,7 @@ import { mountShell } from '../../components/shell.js';
 import { productCard, emptyState } from '../../components/cards.js';
 import { toast } from '../../components/toast.js';
 import { routes } from '../../core/routes.js';
-import { escapeHtml, icon, $, $$, formatPrice } from '../../core/utils.js';
+import { escapeHtml, icon, $, $$, formatPrice, safeMediaUrl } from '../../core/utils.js';
 import { CONFIG } from '../../core/config.js';
 import { store } from '../../core/store.js';
 import { getCart, setQty, removeFromCart, totals, toggleWishlist, inWishlist } from '../../services/cart.js';
@@ -37,7 +37,7 @@ function render() {
           return `<div class="vendor-group-head">${icon('store')} <a href="${routes.vendor(vid)}">${escapeHtml(v?.name || '')}</a></div>
           ${ls.map((l) => `
             <div class="cart-line">
-              <a href="${routes.product(l.product.id)}"><img src="${l.product.thumbnail}" alt=""></a>
+              <a href="${routes.product(l.product.id)}"><img src="${escapeHtml(safeMediaUrl(l.product.thumbnail, l.product.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', l.product.title))}'"></a>
               <div style="min-width:0">
                 <a class="bold clamp-2" href="${routes.product(l.product.id)}">${escapeHtml(l.product.title)}</a>
                 <div class="small muted mt-1">${l.source !== 'store' ? `<span class="badge badge-primary">${icon(l.source === 'live' ? 'radio' : 'clapperboard')} ${tr('From {source}', { source: tr(l.source) })}</span> ` : ''}${l.product.stock <= 5 ? `<span class="text-warning">${tr('Only {count} left', { count: l.product.stock })}</span>` : tr('In stock')}</div>
