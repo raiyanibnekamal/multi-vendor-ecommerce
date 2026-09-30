@@ -1,6 +1,6 @@
 // In-context purchase drawer used by reels and live streams:
 // product -> checkout -> confirmation, without leaving the video page.
-import { escapeHtml, icon, formatPrice, stars, safeMediaUrl } from '../core/utils.js';
+import { escapeHtml, icon, formatPrice, stars } from '../core/utils.js';
 import { routes } from '../core/routes.js';
 import { db } from '../services/db.js';
 import { addToCart } from '../services/cart.js';
@@ -24,7 +24,7 @@ export function openQuickBuy(productId, { source = 'reel', onDone } = {}) {
   const stepProduct = () => {
     body.innerHTML = `
       <div class="row" style="gap:16px;align-items:flex-start">
-        <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'" style="width:120px;height:120px;border-radius:12px;background:var(--surface-2);object-fit:contain;flex-shrink:0">
+        <img src="${p.thumbnail}" alt="" style="width:120px;height:120px;border-radius:12px;background:var(--surface-2);object-fit:contain;flex-shrink:0">
         <div class="grow stack" style="gap:6px">
           <a href="${routes.vendor(v.id)}" class="xs muted">${escapeHtml(v.name)}</a>
           <h3 style="font-size:16px">${escapeHtml(p.title)}</h3>
@@ -68,7 +68,7 @@ export function openQuickBuy(productId, { source = 'reel', onDone } = {}) {
     body.innerHTML = `
       <button class="btn btn-ghost btn-sm mb-2" data-back>${icon('arrow-left')} Back</button>
       <div class="row" style="gap:12px">
-        <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'" style="width:56px;height:56px;border-radius:10px;background:var(--surface-2);object-fit:contain">
+        <img src="${p.thumbnail}" alt="" style="width:56px;height:56px;border-radius:10px;background:var(--surface-2);object-fit:contain">
         <div class="grow"><div class="small bold clamp-2">${escapeHtml(p.title)}</div><div class="xs muted">Qty ${qty} × ${formatPrice(p.price)}</div></div>
       </div>
       <hr class="divider">

@@ -1,7 +1,7 @@
 import { CONFIG } from '../core/config.js';
 import { routes, dashboardFor } from '../core/routes.js';
 import { currentUser, logout } from '../core/auth.js';
-import { escapeHtml, icon, avatar, debounce, on, qs, t, formatPrice, safeMediaUrl } from '../core/utils.js';
+import { escapeHtml, icon, avatar, debounce, on, qs, t, formatPrice } from '../core/utils.js';
 import { themeToggleHtml } from '../core/theme.js';
 import { langToggleHtml } from '../core/i18n.js';
 import { cartCount, getWishlistIds } from '../services/cart.js';
@@ -139,7 +139,7 @@ function bindHeader(el) {
     box.innerHTML = `
       <a href="${routes.search(q)}">${icon('sparkles', 'text-primary')}<span>${t('Smart search for "{q}" across products, reels & live', { q: `<b>${escapeHtml(q)}</b>` })}</span></a>
       ${categories.length ? `<div class="label">${t('Categories')}</div>${categories.map((c) => `<a href="${routes.products({ category: c.id })}">${icon('folder')} ${escapeHtml(t(c.name))}</a>`).join('')}` : ''}
-      ${products.length ? `<div class="label">${t('Products')}</div>${products.map((p) => `<a href="${routes.product(p.id)}"><img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'"><span class="truncate">${escapeHtml(p.title)}</span></a>`).join('')}` : ''}`;
+      ${products.length ? `<div class="label">${t('Products')}</div>${products.map((p) => `<a href="${routes.product(p.id)}"><img src="${p.thumbnail}" alt=""><span class="truncate">${escapeHtml(p.title)}</span></a>`).join('')}` : ''}`;
     box.classList.remove('hidden');
   }, 150);
   input.addEventListener('input', render);

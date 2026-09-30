@@ -3,7 +3,7 @@ import { emptyState } from '../../components/cards.js';
 import { toast } from '../../components/toast.js';
 import { routes } from '../../core/routes.js';
 import { requireRole } from '../../core/auth.js';
-import { escapeHtml, icon, $, $$, formatPrice, uid, safeMediaUrl } from '../../core/utils.js';
+import { escapeHtml, icon, $, $$, formatPrice, uid } from '../../core/utils.js';
 import { store } from '../../core/store.js';
 import { getCart, totals, clearCart } from '../../services/cart.js';
 import { placeOrder, PAYMENT_METHODS, COUPONS } from '../../services/orders.js';
@@ -80,7 +80,7 @@ function render() {
         <section class="card"><div class="card-head"><h3>${icon('map-pin', 'text-primary')} ${tr('Delivery address')}</h3></div><div class="card-body" data-addr>${addressCards()}</div></section>
         <section class="card"><div class="card-head"><h3>${icon('credit-card', 'text-primary')} ${tr('Payment method')}</h3></div><div class="card-body" data-pay>${paymentHtml()}</div></section>
         <section class="card"><div class="card-head"><h3>${icon('package', 'text-primary')} ${tr('Review items ({count})', { count: t.count })}</h3><a class="small text-primary" href="${routes.cart()}">${tr('Edit cart')}</a></div>
-          <div>${lines.map((l) => `<div class="feed-item"><img src="${escapeHtml(safeMediaUrl(l.product.thumbnail, l.product.title))}" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', l.product.title))}'" style="width:52px;height:52px;border-radius:8px;background:var(--surface-2);object-fit:contain"><div class="grow"><div class="small bold truncate">${escapeHtml(l.product.title)}</div><div class="xs muted">${escapeHtml(db.get('vendors', l.product.vendorId)?.name || '')} · Qty ${l.qty}</div></div><b class="small">${formatPrice(l.product.price * l.qty)}</b></div>`).join('')}</div>
+          <div>${lines.map((l) => `<div class="feed-item"><img src="${l.product.thumbnail}" style="width:52px;height:52px;border-radius:8px;background:var(--surface-2);object-fit:contain"><div class="grow"><div class="small bold truncate">${escapeHtml(l.product.title)}</div><div class="xs muted">${escapeHtml(db.get('vendors', l.product.vendorId)?.name || '')} · Qty ${l.qty}</div></div><b class="small">${formatPrice(l.product.price * l.qty)}</b></div>`).join('')}</div>
         </section>
       </div>
       <aside class="card card-pad summary">

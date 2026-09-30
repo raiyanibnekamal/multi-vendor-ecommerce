@@ -1,7 +1,7 @@
 // Database Layer with dual-mode support (Mock / Live Supabase)
 import { store } from '../core/store.js';
 import { CONFIG } from '../core/config.js';
-import { sleep, uid, safeMediaUrl } from '../core/utils.js';
+import { sleep, uid } from '../core/utils.js';
 import { getSupabase } from '../core/supabase.js?v=20260928-11';
 
 import { categories } from '../data/categories.js';
@@ -35,33 +35,12 @@ const cache = {};
 const tableKey = (t) => `db_${t}`;
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
-function normalizeRowMedia(row) {
-  if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
-  if (typeof row.thumbnail === 'string') {
-    row.thumbnail = safeMediaUrl(row.thumbnail, row.title || row.name);
-  }
-  if (Array.isArray(row.images)) {
-    row.images = row.images.map((img) => safeMediaUrl(img, row.title));
-  }
-  if (typeof row.poster === 'string') {
-    row.poster = safeMediaUrl(row.poster, row.title || row.caption);
-  }
-  if (Array.isArray(row.items)) {
-    for (const it of row.items) {
-      if (typeof it.thumbnail === 'string') {
-        it.thumbnail = safeMediaUrl(it.thumbnail, it.title);
-      }
-    }
-  }
-  return row;
-}
-
 function hydrateSeedRow(table, row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
   const seedTable = SEEDS[table] || [];
   const seed = seedTable.find((candidate) => candidate && candidate.id === row.id);
-  const hydrated = seed ? { ...seed, ...row } : row;
-  return normalizeRowMedia(hydrated);
+  if (!seed) return row;
+  return { ...seed, ...row };
 }
 
 function hydrateSeedRows(table, rows) {

@@ -4,7 +4,7 @@ import { ensureLogin } from '../../components/modal.js';
 import { toast } from '../../components/toast.js';
 import { emptyState, loading } from '../../components/cards.js';
 import { routes } from '../../core/routes.js';
-import { escapeHtml, icon, qs, $, $$, avatar, formatNumber, formatPrice, timeUntil, formatDateTime, safeMediaUrl } from '../../core/utils.js';
+import { escapeHtml, icon, qs, $, $$, avatar, formatNumber, formatPrice, timeUntil, formatDateTime } from '../../core/utils.js';
 import { getStream, getStreamMessages, streamSync, streamChannel, sendChat, sendReaction, toggleStreamLike, simulateAudience, REACTIONS } from '../../services/live.js';
 import { SAMPLE_VIDEOS } from '../../services/reels.js';
 import { vendorSync, isFollowing, toggleFollow } from '../../services/vendors.js';
@@ -27,7 +27,7 @@ function pinnedHtml(s) {
   if (!p) return '';
   return `
     <div class="pinned" data-pinned>
-      <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'">
+      <img src="${p.thumbnail}" alt="">
       <div class="grow" style="min-width:0">
         <span class="tag">${icon('pin')} Pinned</span>
         <div class="t truncate">${escapeHtml(p.title)}</div>
@@ -42,7 +42,7 @@ function productsHtml(s) {
     const p = db.get('products', pid);
     if (!p) return '';
     return `<div class="sp-item ${pid === s.pinnedProductId ? 'is-pinned' : ''}">
-      <img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'">
+      <img src="${p.thumbnail}" alt="">
       <div class="grow" style="min-width:0"><div class="t clamp-2">${escapeHtml(p.title)}</div><div class="p">${formatPrice(p.price)}</div></div>
       <button class="btn btn-primary btn-xs" data-buy="${p.id}">Buy</button>
     </div>`;

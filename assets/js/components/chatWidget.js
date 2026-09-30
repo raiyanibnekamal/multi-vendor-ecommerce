@@ -1,4 +1,4 @@
-import { escapeHtml, icon, formatPrice, safeMediaUrl } from '../core/utils.js';
+import { escapeHtml, icon, formatPrice } from '../core/utils.js';
 import { routes } from '../core/routes.js';
 import { supportChat } from '../services/ai.js';
 import { store } from '../core/store.js';
@@ -17,7 +17,7 @@ function linkHref(code) {
 function botHtml(res) {
   const text = escapeHtml(res.text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   const products = res.products?.length
-    ? `<div class="mini-products">${res.products.map((p) => `<a href="${routes.product(p.id)}"><img src="${escapeHtml(safeMediaUrl(p.thumbnail, p.title))}" alt="" onerror="this.onerror=null;this.src='${escapeHtml(safeMediaUrl('', p.title))}'"><span class="grow"><span class="clamp-2">${escapeHtml(p.title)}</span><b class="text-primary">${formatPrice(p.price)}</b></span></a>`).join('')}</div>`
+    ? `<div class="mini-products">${res.products.map((p) => `<a href="${routes.product(p.id)}"><img src="${p.thumbnail}" alt=""><span class="grow"><span class="clamp-2">${escapeHtml(p.title)}</span><b class="text-primary">${formatPrice(p.price)}</b></span></a>`).join('')}</div>`
     : '';
   const links = res.links?.length ? `<div class="row wrap mt-1">${res.links.map((l) => `<a class="btn btn-soft btn-xs" href="${linkHref(l.href)}">${escapeHtml(l.label)}</a>`).join('')}</div>` : '';
   return text + products + links;
