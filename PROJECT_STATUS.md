@@ -3,7 +3,7 @@
 > **Last Updated:** 2026-09-30<br>
 > **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`<br>
 > **Status:** Production-Ready for GitHub Push & Vercel Deployment<br>
-> **Live App (Vercel):** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)<br>
+> **Live App (Vercel):** [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/)<br>
 > **Supabase Endpoint:** `https://llgyqsfxiokvmxqhztin.supabase.co`<br>
 > **Quick Links:** [Executive Summary](#-executive-summary) • [Feature Matrix](#-feature-by-feature-audit--backend-readiness) • [Supabase Audit](#%EF%B8%8F-supabase-database--security-audit) • [Vercel Readiness](#-vercel-deployment-readiness) • [Go-Live Steps](#-steps-for-github-push--vercel-go-live)
 

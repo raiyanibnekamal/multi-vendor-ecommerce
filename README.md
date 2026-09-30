@@ -1,6 +1,6 @@
 # StreamCart
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel&logoColor=white)](https://multi-vendor-ecommerce-ten.vercel.app/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel&logoColor=white)](https://multi-vendor-ecommerce-neon.vercel.app/)
 [![Frontend](https://img.shields.io/badge/Frontend-Vanilla%20JS%20%2B%20CSS-yellow)](https://developer.mozilla.org/)
 [![Database](https://img.shields.io/badge/Backend-Supabase%20PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![Auth](https://img.shields.io/badge/Auth-Firebase%20Google%20OAuth-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
@@ -10,7 +10,7 @@
 
 StreamCart is a next-generation multi-vendor social-commerce web application. Customers discover and buy products seamlessly through a modern storefront, shoppable vertical video reels, and interactive live shopping broadcasts. Vendors manage their stores, products, fulfillment, reels, and live studio. Administrators oversee platform vendors, dispute resolutions, payouts, moderation, and marketplace configurations.
 
-- **🌐 Live Web App:** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)
+- **🌐 Live Web App:** [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/)
 - **⚡ Tech Stack:** HTML5, CSS3, Vanilla JavaScript ES Modules, Supabase (PostgreSQL 15+, Auth, Storage, Realtime, RPCs), Firebase Auth (Google OAuth), Agora RTC Web SDK, Vercel Serverless Functions, Optional Groq AI (`openai/gpt-oss-120b`).
 - **📱 Application Scale:** 47 tracked HTML pages across Storefront, Account, Reels, Live, Vendor Studio, and Admin Panel.
 - **📚 Documentation:** [Architecture Guide](docs/ARCHITECTURE.md) | [Audit & Roadmap](docs/AUDIT_AND_ROADMAP.md) | [Project Status Report](PROJECT_STATUS.md) | [Supabase Setup Guide](supabase/README.md)

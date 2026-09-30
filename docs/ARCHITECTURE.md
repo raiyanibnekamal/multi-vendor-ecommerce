@@ -155,7 +155,7 @@ The browser calls only the same-origin `/api/ai` endpoint. When configured, `GRO
 
 ## 7. Backend readiness and deployment notes
 
-The following diagrams and tables describe the backend boundary, not a claim that every external production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). Existing Supabase projects must apply migrations 01-11 in order; the frontend does not run database migrations automatically.
+The following diagrams and tables describe the backend boundary, not a claim that every external production workflow is deployed. The frontend is deployed at [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/). Existing Supabase projects must apply migrations 01-11 in order; the frontend does not run database migrations automatically.
 
 ### 7.1 Architecture & Component Map
 

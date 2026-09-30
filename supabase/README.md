@@ -2,7 +2,7 @@
 
 This folder contains the Supabase schema, policies, seed data, and deployment scripts used by StreamCart. The app includes Agora RTC transport, but a production launch still requires correctly configured Agora/Vercel credentials and network validation. Payment webhooks, actual payout transfers, and automatic refund execution still require trusted provider integrations.
 
-The frontend is deployed at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/). The current repo state includes the demo storefront, live-buy flows, vendor/admin consoles, optional AI integration, Agora RTC transport, and the Supabase bridge for live auth/data. Apply migrations 01-11 in order before using the corresponding live workflows. Migration 07 fixes recursive order RLS; migration 08 adds server-authoritative commerce operations and profile/vendor protections; migrations 09-11 add social persistence, security hardening, and order notifications.
+The frontend is deployed at [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/). The current repo state includes the demo storefront, live-buy flows, vendor/admin consoles, optional AI integration, Agora RTC transport, and the Supabase bridge for live auth/data. Apply migrations 01-11 in order before using the corresponding live workflows. Migration 07 fixes recursive order RLS; migration 08 adds server-authoritative commerce operations and profile/vendor protections; migrations 09-11 add social persistence, security hardening, and order notifications.
 
 ---
 
@@ -68,7 +68,7 @@ If you already ran the initial tables or are connecting to your existing Supabas
 1. Push your repository to GitHub.
 2. Go to [vercel.com](https://vercel.com) and import your `multi-vendor-ecommerce` repo.
 3. Keep default settings and click **Deploy**.
-4. The current frontend is also available at [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/).
+4. The current frontend is also available at [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/).
 
 ## Existing project migrations
 

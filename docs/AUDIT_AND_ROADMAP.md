@@ -3,7 +3,7 @@
 > **Audit Date:** 2026-09-30
 > **Repository:** `raiyanibnekamal/multi-vendor-ecommerce`
 > **Status:** Fully Audited & Ready for Production Push
-> **Live app:** [multi-vendor-ecommerce-ten.vercel.app](https://multi-vendor-ecommerce-ten.vercel.app/)
+> **Live app:** [multi-vendor-ecommerce-neon.vercel.app](https://multi-vendor-ecommerce-neon.vercel.app/)
 
 ---
 
