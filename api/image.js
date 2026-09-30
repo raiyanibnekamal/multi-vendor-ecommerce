@@ -40,6 +40,63 @@ function getFallback(url) {
   return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80';
 }
 
+function generateFallbackSvg(label = 'Product') {
+  const safeLabel = String(label).replace(/[&<>"']/g, '');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#1e293b"/>
+        <stop offset="100%" stop-color="#0f172a"/>
+      </linearGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#g)" rx="28"/>
+    <circle cx="300" cy="240" r="88" fill="#3b82f6" opacity="0.18"/>
+    <path d="M220 280 L380 280 L340 370 L260 370 Z" fill="#60a5fa" opacity="0.3"/>
+    <text x="300" y="440" text-anchor="middle" fill="#f8fafc" font-size="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700">${safeLabel}</text>
+    <text x="300" y="480" text-anchor="middle" fill="#94a3b8" font-size="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">StreamCart Verified Product</text>
+  </svg>`;
+}
+
+async function serveFallback(res, targetUrl) {
+  const fallbackUrl = getFallback(targetUrl);
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const fallbackRes = await fetch(fallbackUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    clearTimeout(timeout);
+    if (fallbackRes.ok) {
+      const fbBuffer = Buffer.from(await fallbackRes.arrayBuffer());
+      res.writeHead(200, {
+        'Content-Type': fallbackRes.headers.get('content-type') || 'image/jpeg',
+        'Content-Length': fbBuffer.length,
+        'Cache-Control': 'public, max-age=604800, s-maxage=2592000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(fbBuffer);
+      return;
+    }
+  } catch (_) {}
+
+  // Instant SVG fallback that NEVER fails and needs NO external network
+  const label = targetUrl.split('/').filter(Boolean).slice(-2, -1)[0]?.replace(/-/g, ' ') || 'Product';
+  const svg = generateFallbackSvg(label.toUpperCase());
+  const svgBuffer = Buffer.from(svg, 'utf-8');
+  res.writeHead(200, {
+    'Content-Type': 'image/svg+xml; charset=utf-8',
+    'Content-Length': svgBuffer.length,
+    'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+    'X-Content-Type-Options': 'nosniff',
+    'Access-Control-Allow-Origin': '*'
+  });
+  res.end(svgBuffer);
+}
+
 module.exports = async function handler(req, res) {
   const targetUrl = req.query?.url || new URL(req.url, 'http://localhost').searchParams.get('url');
 
@@ -73,9 +130,7 @@ module.exports = async function handler(req, res) {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      const fallbackUrl = getFallback(targetUrl);
-      res.writeHead(302, { Location: fallbackUrl, 'Cache-Control': 'public, max-age=3600' });
-      res.end();
+      await serveFallback(res, targetUrl);
       return;
     }
 
@@ -91,8 +146,6 @@ module.exports = async function handler(req, res) {
     });
     res.end(buffer);
   } catch (err) {
-    const fallbackUrl = getFallback(targetUrl);
-    res.writeHead(302, { Location: fallbackUrl, 'Cache-Control': 'public, max-age=300' });
-    res.end();
+    await serveFallback(res, targetUrl);
   }
 };

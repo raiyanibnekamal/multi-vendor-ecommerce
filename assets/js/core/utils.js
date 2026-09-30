@@ -115,12 +115,7 @@ export function safeMediaUrl(url, fallbackLabel = 'Image', fallbackColors) {
     return trimmed;
   }
 
-  // If URL is empty or unusable, pick high-res Unsplash photo matching label
-  if (fallbackLabel) {
-    const photo = getCategoryPhoto(fallbackLabel);
-    if (photo) return photo;
-  }
-
+  // If URL is empty or unusable, return instant inline SVG data-URI (0 network requests, cannot fail)
   return fallbackMediaUrl(fallbackLabel, fallbackColors);
 }
 
