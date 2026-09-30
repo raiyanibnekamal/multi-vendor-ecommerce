@@ -159,7 +159,7 @@ const server = http.createServer(async (req, res) => {
     let stat = null;
     try {
       stat = fs.statSync(filePath);
-    } catch {}
+    } catch { }
 
     if (stat && stat.isDirectory()) {
       const indexFile = path.join(filePath, 'index.html');

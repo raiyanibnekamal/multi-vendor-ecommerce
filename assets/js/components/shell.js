@@ -6,7 +6,6 @@ import { mountChatWidget } from './chatWidget.js';
 import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
 import { toast } from './toast.js';
-import { mountConsoleWidget } from './consoleWidget.js';
 
 /**
  * Mounts the storefront layout (header, footer, mobile nav, AI chat) into #app
@@ -38,7 +37,6 @@ export function mountShell({ active = '', footer = true, chat = true, bottomNav 
 
   bindCardActions();
   if (chat) mountChatWidget();
-  mountConsoleWidget();
   initIcons();
   return app.querySelector('#main');
 }

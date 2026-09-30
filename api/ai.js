@@ -105,17 +105,8 @@ function normalizeResult(action, value, input) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method === 'GET') {
-    return send(res, 200, {
-      status: 'ok',
-      service: 'StreamCart AI Gateway',
-      available: Boolean(process.env.GROQ_API_KEY),
-      model: MODEL,
-      timestamp: new Date().toISOString()
-    });
-  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'GET, POST');
+    res.setHeader('Allow', 'POST');
     return send(res, 405, { error: 'Method not allowed.' });
   }
   const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();

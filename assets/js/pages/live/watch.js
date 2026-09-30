@@ -133,7 +133,7 @@ async function render() {
       fallback.loop = true;
       fallback.playsInline = true;
       stage.replaceChildren(fallback);
-      fallback.play().catch(() => {});
+      fallback.play().catch(() => { });
       toast(`${error.message} Showing the replay preview instead.`, 'error');
     }
     startRealtime(s);
@@ -217,7 +217,7 @@ function bind(s, v) {
     void agoraSession?.setMuted(muted);
     e.currentTarget.innerHTML = icon(muted ? 'volume-x' : 'volume-2');
   };
-  $('[data-share]').onclick = async () => { await navigator.clipboard?.writeText(location.href).catch(() => {}); toast('Stream link copied', 'info'); };
+  $('[data-share]').onclick = async () => { await navigator.clipboard?.writeText(location.href).catch(() => { }); toast('Stream link copied', 'info'); };
   $('[data-follow]').onclick = async (e) => {
     const btn = e.currentTarget;
     if (!(await ensureLogin('Sign in to follow stores'))) return;

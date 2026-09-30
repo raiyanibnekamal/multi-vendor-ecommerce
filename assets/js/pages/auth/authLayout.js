@@ -3,7 +3,6 @@ import { routes } from '../../core/routes.js';
 import { logoHtml } from '../../components/header.js';
 import { db } from '../../services/db.js';
 import { registerSW } from '../../core/pwa.js';
-import { mountConsoleWidget } from '../../components/consoleWidget.js';
 
 /** Split-screen auth layout. Returns the form container. */
 export function mountAuth(sideTitle = 'Watch. Shop. Live.') {
@@ -39,7 +38,6 @@ export function mountAuth(sideTitle = 'Watch. Shop. Live.') {
     <main class="auth-main"><div class="auth-box" data-box></div></main>
   </div>`;
   initIcons();
-  mountConsoleWidget();
   return document.querySelector('[data-box]');
 }
 

@@ -9,7 +9,6 @@ import { logoHtml } from './header.js';
 import { registerSW } from '../core/pwa.js';
 import { channel } from '../services/realtime.js';
 import { toast } from './toast.js';
-import { mountConsoleWidget } from './consoleWidget.js';
 
 function vendorNav(vendor) {
   const vendorId = vendor?.id ?? null;
@@ -81,8 +80,8 @@ export function mountDashboard({ role, active, title }) {
       ${vendor ? `<div class="dash-store">${avatar(vendor.name, { size: 'sm', color: vendor.color })}<div class="grow"><div class="name truncate">${escapeHtml(vendor.name)}</div><div class="xs" style="color:#94a3b8">${vendor.status === 'approved' ? t('Verified seller') : t(vendor.status)}</div></div></div>` : ''}
       <nav class="dash-nav">
         ${nav.map((item) => typeof item === 'string'
-          ? `<div class="group">${t(item)}</div>`
-          : `<a href="${item[4]}" class="${item[0] === active ? 'active' : ''}">${icon(item[1])}<span>${t(item[2])}</span>${item[3] ? `<span class="badge">${item[3]}</span>` : ''}</a>`).join('')}
+    ? `<div class="group">${t(item)}</div>`
+    : `<a href="${item[4]}" class="${item[0] === active ? 'active' : ''}">${icon(item[1])}<span>${t(item[2])}</span>${item[3] ? `<span class="badge">${item[3]}</span>` : ''}</a>`).join('')}
       </nav>
       <div class="bottom dash-nav">
         ${vendor ? `<a href="${routes.vendor(vendor.id)}">${icon('external-link')}<span>${t('View my store')}</span></a>` : ''}
@@ -126,7 +125,6 @@ export function mountDashboard({ role, active, title }) {
   app.querySelector('[data-toggle]').onclick = (e) => { e.stopPropagation(); side.classList.toggle('open'); };
   document.addEventListener('click', (e) => { if (!e.target.closest('[data-side]')) side.classList.remove('open'); });
   initIcons();
-  mountConsoleWidget();
   const content = app.querySelector('[data-content]');
   content.user = user;
   content.vendor = vendor;
